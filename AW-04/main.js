@@ -4,6 +4,7 @@ import {runSim} from 'teardown-kit/runtime.js';
 import {buildWatch} from './watch.js';
 import {sounds,acousticState,microphones} from './acoustics.js';
 import {chapters,parts,tour,tl} from './story.js';
+import {rhythms, loadAssignments, saveAssignments, activePulse} from './haptics.js';
 
 const film=!!window.__CAPTURE || new URLSearchParams(location.search).has('capture');
 document.documentElement.lang='zh-CN';
@@ -11,13 +12,23 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const app=document.querySelector('#app');
   app.classList.toggle('film',film);
   const tabButtons=chapters.map((s,i)=>'<button data-stage="'+i+'">'+s[0]+'</button>').join('');
+  const assignments = loadAssignments(film);
+  const rhythmRows = sounds.map(({name,en}) => {
+    const options = Object.entries(rhythms).map(([id,rhythm]) =>
+      `<option value="${id}" ${id === assignments[en] ? 'selected' : ''}>${rhythm.label}</option>`).join('');
+    return `<div class="rhythm-row"><label for="rhythm-${en}">${name}</label>
+      <select id="rhythm-${en}" data-rhythm="${en}" aria-label="${name}振动节奏">${options}</select>
+      <button data-try="${en}" aria-label="试振：${name}">试振</button></div>`;
+  }).join('');
   app.insertAdjacentHTML('beforeend',`
     <header><div class="brandblock"><svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="20" cy="20" r="11"/><circle cx="20" cy="20" r="4"/><path d="M20 4v8m0 16v8M4 20h8m16 0h8"/><circle cx="20" cy="5" r="2"/><circle cx="35" cy="20" r="2"/><circle cx="20" cy="35" r="2"/><circle cx="5" cy="20" r="2"/></g></svg>AW / 04</div>
     <div class="identity"><small>ACOUSTIC INSTRUMENT &nbsp; / &nbsp; WRIST ARRAY</small><b>声源定位手表 <i>/</i></b><small>AW–04 · INTERACTIVE FIELD SIMULATOR</small></div>
     <div class="heads"><span><small>UNIT ID</small>AW04–SIM</span><span><small>RUNTIME</small><b id="clock"></b></span><span><small>STATUS</small><b id="mode"></b></span></div></header>
     <main><aside class="left">
     <article><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
-    <article><h2>声音识别 <small>CLASSIFIER</small></h2><div class="readline"><strong id="className"></strong><span>端侧 AI<br>模板模拟</span></div><canvas id="graph" width="560" height="64"></canvas><div class="footpair"><span>FEATURE BANDS</span><b>08</b></div></article>
+    <article><h2>声音识别 <small>CLASSIFIER</small></h2><div class="readline"><strong id="className"></strong><span>端侧 AI<br>模板模拟</span></div><canvas id="graph" width="560" height="64"></canvas><div class="haptic-settings"><h2>声音与振感 <small>HAPTICS</small></h2>${rhythmRows}
+    <div class="haptic-readout"><span id="rhythmNow"></span><div id="pulses" aria-hidden="true"></div></div>
+    <p id="hapticFeedback" role="status"></p></div></article>
     <article><h2>麦克风阵列 <small>MIC ARRAY</small></h2><div class="channels">${microphones.map((_,i)=>'<div class="cellrow"><b>M0'+(i+1)+'</b><i><em></em></i><span></span></div>').join('')}</div><div class="footpair"><span>相对首达时间</span><b>Δt / μs</b></div></article>
     </aside>
     <section id="stage" aria-label="可旋转的三维手表"><div class="orbits"><i></i><i></i><i></i></div><div class="axisticks"></div><div class="caption"><span>PROJECTION / ORTHO</span><b id="fig"></b></div><div class="stagecopy"><small>VIEW STATE</small><h1></h1><div class="english"></div></div><div class="stagehint"></div></section>
@@ -49,7 +60,38 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   function user(){if(!manual)savedTime=(lastT-tourOffset+tl.duration)%tl.duration;manual=true;idle=performance.now();}
   function setStage(i){user();sel=-1;rx=ry=0;zoom=1;opening=i===1?performance.now():null;current={...current,stage:i,explode:i===1?0:1};}
   $$('.tabs button').forEach((button,i)=>button.onclick=()=>setStage(i));
-  $$('.options button').forEach((button,i)=>button.onclick=()=>{user();current.src=i;current.bearing=sounds[i].angle;});
+  let lastDetection = '', lastTourCue = -1, pulseStart = -Infinity, replay = false;
+  const feedback = $('#hapticFeedback');
+  const pulseBars = $('#pulses');
+  const deviceSupportsVibration = typeof navigator.vibrate === 'function';
+  const hint = deviceSupportsVibration ? '选一种节奏，点「试振」体验。' : '此浏览器可用节拍条预览振感。';
+  feedback.textContent = film ? '按声音分别设置，表盘同步显示节奏。' : hint;
+  function selectSound(index) {
+    user();
+    current.src = index;
+    current.bearing = sounds[index].angle;
+    replay = true;
+  }
+  $$('.options button').forEach((button,index) => button.onclick = () => selectSound(index));
+  for (const [index, sound] of sounds.entries()) {
+    const select = $('#rhythm-' + sound.en);
+    select.onchange = () => {
+      user();
+      assignments[sound.en] = select.value;
+      const saved = saveAssignments(assignments);
+      feedback.textContent = sound.name + ' · ' + rhythms[select.value].label + (saved ? '，已保存。' : '，仅本次有效。');
+      if (current.src === index) replay = true;
+    };
+    $('[data-try="' + sound.en + '"]').onclick = () => {
+      selectSound(index);
+      feedback.textContent = sound.name + ' · ' + rhythms[assignments[sound.en]].label +
+        (deviceSupportsVibration ? '。' : '（屏幕预览）');
+    };
+  }
+  $('.haptic-settings').addEventListener('keydown', event => event.stopPropagation());
+  document.addEventListener('visibilitychange', () => {
+    if (!film && document.hidden && deviceSupportsVibration && navigator.userActivation?.hasBeenActive) navigator.vibrate(0);
+  });
   $('#bearing').oninput=e=>{user();current.bearing=+e.target.value;};
   let labels=true;
   $('#labelSwitch').onclick=()=>{user();labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
@@ -127,7 +169,33 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     $('#mode').textContent=manual?'MANUAL':'AUTO TOUR';const playhead=manual?savedTime:t;$('#clock').textContent='00:00:'+String(Math.floor(playhead)).padStart(2,'0');
     $('#trackTime').textContent=String(Math.floor(playhead)).padStart(2,'0')+' / '+tl.duration+' s';$('.progress i').style.width=(playhead/tl.duration*100)+'%';
     $('.stagehint').textContent=film?'MODEL  /  AW–04':'拖动旋转 · 滚轮缩放';
-    watch.dial.update(s,t);pose(c,t);renderer.render(scene,camera);
+    const sound = s.detected.en;
+    const rhythmId = assignments[sound];
+    const rhythm = rhythms[rhythmId];
+    const detection = sound + '/' + rhythmId;
+    const tourCue = t >= tl.beats.alarm ? tl.beats.alarm : t >= tl.beats.bird ? tl.beats.bird : t >= tl.beats.dial ? tl.beats.dial : 0;
+    const newTourCue = !manual && tourCue !== lastTourCue;
+    if (!manual) lastTourCue = tourCue;
+    if (lastDetection !== detection || newTourCue || replay) {
+      lastDetection = detection;
+      replay = false;
+      pulseStart = performance.now();
+      $('#rhythmNow').textContent = s.detected.name + ' · ' + rhythm.label;
+      pulseBars.replaceChildren(...rhythm.timing.map((ms,i) => {
+        const segment = document.createElement('i');
+        segment.style.width = (ms * .085) + 'px';
+        segment.className = i % 2 ? 'gap' : 'beat';
+        return segment;
+      }));
+      if (!film && !document.hidden && deviceSupportsVibration && navigator.userActivation?.hasBeenActive) {
+        const accepted = navigator.vibrate(rhythm.timing.length ? rhythm.timing : 0);
+        if (!accepted) feedback.textContent = '当前设备仅显示节拍预览。';
+      }
+    }
+    const elapsedMs = film ? (t - tourCue)*1000 : performance.now() - pulseStart;
+    const pulse = activePulse(rhythm.timing, elapsedMs);
+    for (let i = 0; i < pulseBars.children.length; i++) pulseBars.children[i].classList.toggle('playing', i === pulse);
+    watch.dial.update(s,rhythm,pulse);pose(c,t);renderer.render(scene,camera);
   }
   return {render,resize,warm:()=>renderer.compileAsync(scene,camera)};
 });
