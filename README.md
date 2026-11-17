@@ -11,3 +11,5 @@
 - [下载离线交互页](teardown-out/dist/AW-04.html?raw=true)，用支持 WebGL 2 的浏览器打开。拖动旋转，滚轮缩放，点选右侧部件即可单独查看。
 - [观看或下载演示视频](teardown-out/AW-04.mp4)，25 秒，1920 × 1080，60 fps，含同步音效。
 - [查看模型、声学模拟和动画源码](AW-04/)。
+
+本地开发使用 Node.js 22.12 或以上版本。运行 `npm ci`、`npm run dev` 可预览手表与浅紫色 ASCII Rain 背景。运行 `npm run build` 会生成网站首页，并更新可直接打开的离线 HTML。
