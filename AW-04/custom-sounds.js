@@ -1,4 +1,3 @@
-import {sounds} from './acoustics.js';
 import {rhythms} from './haptics.js';
 
 const storageKey = 'aw04.custom-sounds.v1';
@@ -14,7 +13,8 @@ export function loadCustomSounds() {
   try {
     const entries = JSON.parse(localStorage.getItem(storageKey));
     if (!Array.isArray(entries)) return result;
-    const names = new Set(sounds.map(sound => nameKey(sound.name)));
+    // A newer built-in may share a name with an older saved custom scene.
+    const names = new Set();
     const ids = new Set();
     for (const entry of entries) {
       if (!entry || typeof entry.name !== 'string' || !/^custom-[a-z0-9-]+$/.test(entry.en)) continue;

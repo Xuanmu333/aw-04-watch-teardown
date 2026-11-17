@@ -43,10 +43,10 @@ for j, start in enumerate([0,beat["open"],beat["array"],beat["processor"],beat["
 for start in [0,beat["dial"]]:
     bell(start+.16,783.99,.34,.28)
     bell(start+.58,659.25,.32,.28)
-for k in range(5):
-    pitch=2250+180*(k%3)
-    event(beat["bird"]+.12+k*.39,.20,lambda t,f=pitch:.23*math.sin(math.pi*t/.20)**2*
-          math.sin(tau*(f*t+3200*t*t)+.9*math.sin(89*t)),-.35)
+# Two steady horn tones with a short attack and bright harmonics.
+for pitch in (400, 500):
+    event(beat["horn"]+.12,.65,lambda t,f=pitch:.13*min(1,t/.035)*(
+        math.sin(tau*f*t)+.35*math.sin(tau*2*f*t)+.22*math.sin(tau*3*f*t)),-.35)
 for k in range(5):
     event(beat["alarm"]+.12+k*.46,.25,lambda t:.20*math.sin(math.pi*min(1,t/.25))**.55*(
         math.sin(tau*880*t)+.25*math.sin(tau*1760*t)),.30)

@@ -11,7 +11,7 @@ export const parts=['表壳与链带','底盖','电池','AI 计算板','四麦�
 const b=tl.beats;
 export function tour(t){
   const stage=t>=3.15&&t<b.open?0:t<b.open?1:t<b.array?1:t<b.processor?2:t<b.dial?3:t<b.alarm?4:t<b.haptic?0:5;
-  const src=t<b.bird?0:t<b.alarm?1:2;
+  const src=t<b.horn?0:t<b.alarm?1:2;
   let explode=0;
   if(stage===1){const v=t<b.open?Math.min(1,Math.max(0,(t-1.55)/1.60)):Math.min(1,(t-b.open)/1.9);
     const smooth=v*v*(3-2*v);explode=t<b.open?1-smooth:smooth;}

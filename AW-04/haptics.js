@@ -7,7 +7,7 @@ export const rhythms = {
   off:    {label:'仅表盘提示', timing:[]}
 };
 
-const defaults = {DOORBELL:'double', BIRDSONG:'single', ALARM:'triple'};
+const defaults = {DOORBELL:'double', HORN:'single', ALARM:'triple'};
 const key = 'aw04.sound-rhythms.v1';
 
 export function loadAssignments(film) {
@@ -16,7 +16,8 @@ export function loadAssignments(film) {
     try {
       const saved = JSON.parse(localStorage.getItem(key));
       for (const sound of Object.keys(result)) {
-        if (Object.hasOwn(rhythms, saved?.[sound])) result[sound] = saved[sound];
+        const rhythm = saved?.[sound] ?? (sound === 'HORN' ? saved?.BIRDSONG : undefined);
+        if (Object.hasOwn(rhythms, rhythm)) result[sound] = rhythm;
       }
     } catch { /* The simulator also works without storage. */ }
   }

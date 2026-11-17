@@ -2,7 +2,8 @@ import * as T from 'three';
 import brandMarks from './brand-marks.json';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {runSim} from 'teardown-kit/runtime.js';
-import {createTunnel} from './tunnel.js';
+import {bindGlass} from './glass.js';
+import {bindWeightTitle} from './weight-title.js';
 import {buildWatch} from './watch.js';
 import {sounds,acousticState,microphones} from './acoustics.js';
 import {chapters,parts,tour,tl} from './story.js';
@@ -20,7 +21,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
   app.insertAdjacentHTML('beforeend',`
     <header><img class="brand-emblem" src="${brandMarks.emblem}" alt="Motorola 徽标">
-    <p class="product-title"><strong>SoudBridge</strong>，为听障人士设计的环境感知手表。</p>
+    <p class="product-title" role="heading" aria-level="1">SoudBridge，为听障人士设计的环境感知手表</p>
     <img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
     <main><aside class="left">
     <article class="bearing-panel"><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
@@ -29,20 +30,20 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     <p id="hapticFeedback" role="status"></p></div></article>
     <article><h2>麦克风阵列 <small>MIC ARRAY</small></h2><div class="channels">${microphones.map((_,i)=>'<div class="cellrow"><b>M0'+(i+1)+'</b><i><em></em></i><span></span></div>').join('')}</div><div class="footpair"><span>相对首达时间</span><b>Δt / μs</b></div></article>
     </aside>
-    <section id="stage" aria-label="可旋转的三维手表"><div class="stage-axes" aria-hidden="true"></div><div class="axisticks"></div><div class="stagecopy"><small>VIEW STATE</small><h1></h1><div class="english"></div></div></section>
+    <section id="stage" aria-label="可旋转的三维手表"><div class="stagecopy"><small>VIEW STATE</small><h1></h1><div class="english"></div></div></section>
     <aside class="rightside"><article><h2>定位读数 <small>POSITION</small></h2><div class="radarbox"><canvas class="polar" width="180" height="180"></canvas><dl><dt>对置间距</dt><dd>34 mm</dd><dt>平面阵列</dt><dd>4 CH</dd><dt>表壳直径</dt><dd>42 mm</dd></dl></div></article>
     <article><h2>声源场景 <small>SOURCES</small></h2><div class="options"></div><div class="slider"><label for="bearing">方位角</label><input id="bearing" type="range" min="0" max="359" step="1" value="48"></div></article>
     <article><h2>显示控制 <small>DISPLAY</small></h2><nav class="tabs" aria-label="拆解章节">${tabButtons}</nav><div class="ltoggle"><button id="labelSwitch" aria-pressed="true">部件标注</button></div></article>
     <article><h2>部件索引 <small>ASSEMBLIES</small></h2><div class="partlist">${parts.map((s,i)=>'<button data-part="'+i+'"><i></i><b>'+s+'</b><span>0'+(i+1)+'</span></button>').join('')}</div></article></aside></main>
     <footer><div class="consolefoot"><div class="trackinfo"><h2>导览记录 <small>SEQUENCE LOG</small></h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="暂停自动导览"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div><div class="footline"><img class="brand-hackathon" src="${brandMarks.hackathon}" alt="hackathon"><span>AW–04 &nbsp; · &nbsp; ACOUSTIC SYSTEMS</span></div></footer>`);
   const $=s=>app.querySelector(s),$$=s=>[...app.querySelectorAll(s)];
+  bindWeightTitle($('.product-title'));
   const stage=$('#stage');stage.prepend(canvas);
   const leaders=document.createElement('canvas');leaders.className='leaders';stage.append(leaders);const legend=leaders.getContext('2d');
   const tags=microphones.map((_,i)=>{const e=document.createElement('span');e.className='mic-tag';e.textContent='M0'+(i+1);stage.append(e);return e;});
   const renderer=new T.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});
   renderer.setClearColor(0,0);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.92;
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.65));
-  const drawTunnel=createTunnel(document.querySelector('#tunnel-background'),tl.duration);
   const scene=new T.Scene(),camera=new T.OrthographicCamera(-40,40,40,-40,.1,500);
   camera.position.z=180;
   const studio=new RoomEnvironment(),pm=new T.PMREMGenerator(renderer),env=pm.fromScene(studio,.025);
@@ -78,27 +79,28 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     options.replaceChildren();
     rows.replaceChildren();
     for (const [index,sound] of catalog.entries()) {
+      const label = sound.custom && sounds.some(preset => preset.name === sound.name) ? sound.name + '（自定义）' : sound.name;
       const button = document.createElement('button');
       button.dataset.sound = index;
-      button.textContent = sound.name;
+      button.textContent = label;
       button.onclick = () => selectSound(index);
       options.append(button);
 
       const row = document.createElement('div');
       row.className = 'rhythm-row';
       const title = document.createElement(sound.custom ? 'button' : 'label');
-      title.textContent = sound.name;
+      title.textContent = label;
       const selectId = 'rhythm-' + sound.en;
       if (!sound.custom) title.htmlFor = selectId;
       if (sound.custom) {
         title.className = 'edit-sound';
-        title.setAttribute('aria-label','编辑声音：' + sound.name);
+        title.setAttribute('aria-label','编辑声音：' + label);
         title.onclick = () => { user(); openEditor(sound); };
       }
       const select = document.createElement('select');
       select.id = selectId;
       select.dataset.rhythm = sound.en;
-      select.setAttribute('aria-label',sound.name + '振动节奏');
+      select.setAttribute('aria-label',label + '振动节奏');
       for (const [id,preset] of Object.entries(rhythms)) select.add(new Option(preset.label,id));
       select.value = rhythmFor(sound);
       select.onchange = () => {
@@ -112,7 +114,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       const preview = document.createElement('button');
       preview.textContent = '试振';
       preview.dataset.try = sound.en;
-      preview.setAttribute('aria-label','试振：' + sound.name);
+      preview.setAttribute('aria-label','试振：' + label);
       preview.onclick = () => {
         if (current.stage !== 0) setStage(0);
         selectSound(index);
@@ -146,6 +148,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     drawSoundControls();
     feedback.textContent = sound.name + (saved ? '，已删除。' : '，仅本次移除。');
   });
+  bindGlass(document.querySelectorAll('#app article,#app .consolefoot,.sound-editor'));
   if (!film) $('#addSound').onclick = () => { user(); openEditor(null); };
   drawSoundControls();
   $('.haptic-settings').addEventListener('keydown', event => event.stopPropagation());
@@ -250,7 +253,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     const rhythmId = rhythmFor(s.detected);
     const rhythm = rhythms[rhythmId];
     const detection = sound + '/' + rhythmId;
-    const tourCue = t >= tl.beats.haptic ? tl.beats.haptic : t >= tl.beats.alarm ? tl.beats.alarm : t >= tl.beats.bird ? tl.beats.bird : t >= tl.beats.dial ? tl.beats.dial : 0;
+    const tourCue = t >= tl.beats.haptic ? tl.beats.haptic : t >= tl.beats.alarm ? tl.beats.alarm : t >= tl.beats.horn ? tl.beats.horn : t >= tl.beats.dial ? tl.beats.dial : 0;
     const newTourCue = !manual && tourCue !== lastTourCue;
     if (!manual) lastTourCue = tourCue;
     if (lastDetection !== detection || newTourCue || replay) {
@@ -276,7 +279,6 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     watch.actuator.update(id===5,drive);
     watch.dial.update(s);
     pose(c,manual && id===0 ? savedTime : t,drive);
-    drawTunnel(raw);
     renderer.render(scene,camera);
   }
   return {render,resize,warm:()=>renderer.compileAsync(scene,camera)};

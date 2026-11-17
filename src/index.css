@@ -27,34 +27,24 @@
 }
 #app { background: transparent; }
 
-/* Pool the light beneath the glass; leave the brand margins on the sampled paper. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 76px 0 36px;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 9% 30%, #ac98e052, transparent 37%),
-    radial-gradient(ellipse at 91% 64%, #9eade350, transparent 37%),
-    radial-gradient(ellipse at 48% 39%, #ffffff70, transparent 53%);
-  mask-image: linear-gradient(transparent, black 12% 86%, transparent);
-}
-@media (max-width:760px) {
-  body::before { inset: 56px 0 30px; }
+@font-face {
+  font-family: 'SoudBridge Title SC';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('./fonts/noto-sans-sc-title.woff2') format('woff2');
 }
 
-#tunnel-background {
+#tpm-background {
   position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: #fff;
+}
+.tpm-ring-field {
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
-  opacity: .48;
-  mask-image:
-    linear-gradient(transparent, black 12% 86%, transparent),
-    radial-gradient(ellipse at 50% 45%, #0002 12%, #0009 40%, #000 69%);
-  mask-composite: intersect;
-}
-@media (max-width:760px) {
-  #tunnel-background { opacity: .36; }
+  display: block;
 }

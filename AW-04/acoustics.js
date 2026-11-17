@@ -3,7 +3,7 @@ export const radius = 17;
 export const microphones = [[0,radius],[radius,0],[0,-radius],[-radius,0]];
 export const sounds = [
   {name:'门铃', en:'DOORBELL', angle:48, bins:[.03,.10,.93,.82,.18,.07,.02,.01]},
-  {name:'鸟鸣', en:'BIRDSONG', angle:302, bins:[.01,.02,.03,.07,.20,.77,.98,.57]},
+  {name:'车鸣', en:'HORN', angle:302, bins:[.18,.98,.55,.26,.38,.13,.08,.04]},
   {name:'警报', en:'ALARM', angle:132, bins:[.02,.73,.22,.10,.89,.12,.45,.08]}
 ];
 export function acousticState(source, bearing, t, catalog = sounds) {
