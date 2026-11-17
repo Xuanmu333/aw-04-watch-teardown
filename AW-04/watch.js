@@ -18,8 +18,8 @@ function painted(p,side,fn,x,y,z,w,h=w){
   const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=4;
   return mesh(p,new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}),x,y,z);
 }
-function screw(p,x,y,z,r=.75){
-  disc(p,r,.18,bright,x,y,z,24);const slot=box(p,r*1.38,.22,.06,.05,black,x,y,z+.11);slot.rotation.z=-.55;
+function screw(p,x,y,z,r=.75,slotAngle=-.55){
+  disc(p,r,.18,bright,x,y,z,24);const slot=box(p,r*1.38,.22,.06,.05,black,x,y,z+.11);slot.rotation.z=slotAngle;
 }
 function consolidate(g){
   g.updateWorldMatrix(true,true);
@@ -100,7 +100,7 @@ export function buildWatch(){
   for(let i=0;i<4;i++){
     const a=(i+.5)*Math.PI/2,x=19.28*Math.sin(a),y=19.28*Math.cos(a),g=group(root);
     disc(bezel,1.02,.07,black,x,y,5.82,24);
-    screw(g,0,0,0,1.13);disc(g,.49,3.15,graphite,0,0,-1.63,20);
+    screw(g,0,0,0,1.13,-a);disc(g,.49,3.15,graphite,0,0,-1.63,20);
     for(let k=0;k<7;k++)disc(g,.56,.13,brushed,0,0,-.42-k*.4,20);
     consolidate(g);fasteners.push({g,x,y});
   }
