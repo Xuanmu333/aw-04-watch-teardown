@@ -66,10 +66,9 @@ function buildActuator(root){
   }
   springMesh.geometry.morphAttributes.position=[bent];
   springMesh.updateMorphTargets();
-  return {layer,update(section,pulse,elapsed){
+  return {layer,update(section,drive){
     cap.visible=!section;
-    // Slow the carrier so its direction is readable; preserve the actual pulse envelope.
-    const phase=section && pulse>=0 ? Math.sin(elapsed*.032) : 0;
+    const phase=section ? drive : 0;
     mover.position.y=.23*phase;
     springMesh.morphTargetInfluences[0]=phase;
   }};

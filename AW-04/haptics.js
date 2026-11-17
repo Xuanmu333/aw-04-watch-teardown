@@ -39,3 +39,12 @@ export function activePulse(timing, elapsedMs) {
   }
   return -1;
 }
+
+// Slow the carrier for the visual model while preserving every pulse and gap.
+export function drivePhase(timing, pulse, elapsedMs) {
+  if (pulse < 0) return 0;
+  let withinPulse = elapsedMs;
+  for (let i = 0; i < pulse; i++) withinPulse -= timing[i];
+  const envelope = Math.min(1, withinPulse / 18, (timing[pulse] - withinPulse) / 18);
+  return envelope * Math.sin(withinPulse * 2 * Math.PI * 9 / 1000);
+}

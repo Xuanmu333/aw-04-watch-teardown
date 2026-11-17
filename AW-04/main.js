@@ -5,7 +5,7 @@ import {runSim} from 'teardown-kit/runtime.js';
 import {buildWatch} from './watch.js';
 import {sounds,acousticState,microphones} from './acoustics.js';
 import {chapters,parts,tour,tl} from './story.js';
-import {rhythms, loadAssignments, saveAssignments, activePulse} from './haptics.js';
+import {rhythms, loadAssignments, saveAssignments, activePulse, drivePhase} from './haptics.js';
 
 import {customSound, loadCustomSounds, saveCustomSounds, createSoundEditor} from './custom-sounds.js';
 
@@ -60,8 +60,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const feedback = $('#hapticFeedback');
   const pulseBars = $('#pulses');
   const deviceSupportsVibration = typeof navigator.vibrate === 'function';
-  const hint = deviceSupportsVibration ? '选一种节奏，点「试振」体验。' : '此浏览器可用节拍条预览振感。';
-  feedback.textContent = film ? '按声音分别设置，表盘同步显示节奏。' : hint;
+  const hint = '选一种节奏，点「试振」看整表振动。';
+  feedback.textContent = film ? '表壳与表带随当前声音的节奏振动。' : hint;
   function selectSound(index) {
     user();
     current.src = index;
@@ -111,7 +111,12 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       preview.dataset.try = sound.en;
       preview.setAttribute('aria-label','试振：' + sound.name);
       preview.onclick = () => {
+        if (current.stage !== 0) setStage(0);
         selectSound(index);
+        const rect = stage.getBoundingClientRect();
+        if (rect.top < 0 || rect.bottom > window.innerHeight) {
+          stage.scrollIntoView({block:'center',behavior:'instant'});
+        }
         feedback.textContent = sound.name + ' · ' + rhythms[rhythmFor(sound)].label +
           (deviceSupportsVibration ? '。' : '（屏幕预览）');
       };
@@ -167,13 +172,14 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   function resize(){W=stage.clientWidth;H=stage.clientHeight;if(W&&H)renderer.setSize(W,H,false);}
   new ResizeObserver(resize).observe(stage);
   const explodeOffsets=[0,-9,10,24,38,52,65,0];
-  function pose(c,t){
+  function pose(c,t,drive){
     const id=c.stage,ex=id===1&&sel<0?c.explode:0,angle=t*.45;
     let yaw=-.62+.11*Math.sin(angle),pitch=.13+.06*Math.sin(angle*.55),roll=-.17;
     if(id===1){yaw=T.MathUtils.lerp(-.66,.88+.075*Math.sin(angle),ex);pitch=T.MathUtils.lerp(.14,-.61,ex);roll=T.MathUtils.lerp(-.17,.13,ex);}
     if(id===2||id===3||sel>=0){yaw=-.23+.21*Math.sin(angle*.55);pitch=.28;roll=-.10;}
     if(id===5){yaw=-.22;pitch=-.55;roll=-.12;}
     if(id===4){yaw=.12*Math.cos(angle*.60);pitch=.035;roll=.025;}
+    watch.root.position.set(0,0,0);
     watch.root.rotation.set(pitch+rx,yaw+ry,roll,'YXZ');
     const focus=id===1?sel:id===2?4:id===3?3:id===5?7:-1;
     watch.layers.forEach((g,i)=>{g.visible=focus<0||focus===i;g.position.z=explodeOffsets[i]*ex;});
@@ -188,6 +194,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     const height=Math.max(size.y/coverage,size.x/(W/H*coverage),1)/zoom;
     camera.left=-height*W/H/2;camera.right=-camera.left;camera.top=height/2;camera.bottom=-height/2;
     camera.position.set(centre.x,centre.y,180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    // Frame the resting assembly first so the camera does not track its vibration.
+    if(id===0 || id===4) watch.root.translateY(-1.15*drive);
     leaders.hidden=!(id===1 && ex>.76 && sel<0 && labels && W>310);
     if(!leaders.hidden){
       const dpr=Math.min(devicePixelRatio,2);
@@ -256,14 +264,17 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       }));
       if (!film && !document.hidden && deviceSupportsVibration && navigator.userActivation?.hasBeenActive) {
         const accepted = navigator.vibrate(rhythm.timing.length ? rhythm.timing : 0);
-        if (!accepted) feedback.textContent = '当前设备仅显示节拍预览。';
+        if (!accepted) feedback.textContent = '当前设备使用屏幕预览。';
       }
     }
     const elapsedMs = film ? (t - tourCue)*1000 : performance.now() - pulseStart;
     const pulse = activePulse(rhythm.timing, elapsedMs);
     for (let i = 0; i < pulseBars.children.length; i++) pulseBars.children[i].classList.toggle('playing', i === pulse);
-    watch.actuator.update(id===5,pulse,elapsedMs);
-    watch.dial.update(s,rhythm,pulse);pose(c,t);renderer.render(scene,camera);
+    const drive = drivePhase(rhythm.timing,pulse,elapsedMs);
+    watch.actuator.update(id===5,drive);
+    watch.dial.update(s);
+    pose(c,manual && id===0 ? savedTime : t,drive);
+    renderer.render(scene,camera);
   }
   return {render,resize,warm:()=>renderer.compileAsync(scene,camera)};
 });
