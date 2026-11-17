@@ -5,7 +5,7 @@ export function makeDial(){
   texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=4;
   function line(x,y,xx,yy,color,w){c.beginPath();c.moveTo(x,y);c.lineTo(xx,yy);c.strokeStyle=color;c.lineWidth=w;c.stroke();}
   function arc(r,a,b,color,w){c.beginPath();c.arc(0,0,r,a,b);c.strokeStyle=color;c.lineWidth=w;c.stroke();}
-  function txt(str,x,y,size,weight,color,mono=false){c.fillStyle=color;c.font=weight+' '+size+'px '+(mono?'"JetBrains Mono", monospace':'Inter, "PingFang SC", sans-serif');c.textAlign='center';c.fillText(str,x,y);}
+  function txt(str,x,y,size,weight,color,mono=false,maxWidth){c.fillStyle=color;c.font=weight+' '+size+'px '+(mono?'"JetBrains Mono", monospace':'Inter, "PingFang SC", sans-serif');c.textAlign='center';if(maxWidth)c.fillText(str,x,y,maxWidth);else c.fillText(str,x,y);}
   function update(s,rhythm,pulse){
     c.setTransform(1,0,0,1,320,320);c.fillStyle='#131421';c.fillRect(-320,-320,640,640);
     const a=(s.angle-90)*Math.PI/180, spread=Math.PI/9;
@@ -19,7 +19,7 @@ export function makeDial(){
     txt('A U R A   /   0 4',0,-180,21,650,'#c9c9dd');
     txt('10:08',0,-87,63,550,'#f2f1fb',true);
     txt(s.degree+'°',0,29,69,600,'#d4c7ff',true);
-    txt(s.detected.name,0,68,29,600,'#f4f1ff');
+    txt(s.detected.name,0,68,29,600,'#f4f1ff',false,340);
     const scale = Math.min(.26, 220 / Math.max(1,rhythm.timing.reduce((a,b)=>a+b,0)));
     let x = -rhythm.timing.reduce((a,b)=>a+b,0)*scale/2;
     for (const [i,ms] of rhythm.timing.entries()) {
