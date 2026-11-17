@@ -1,4 +1,5 @@
 import * as T from 'three';
+import brandMarks from './brand-marks.json';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {runSim} from 'teardown-kit/runtime.js';
 import {buildWatch} from './watch.js';
@@ -17,9 +18,9 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const assignments = loadAssignments(film);
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
   app.insertAdjacentHTML('beforeend',`
-    <header><div class="brandblock"><svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="20" cy="20" r="11"/><circle cx="20" cy="20" r="4"/><path d="M20 4v8m0 16v8M4 20h8m16 0h8"/><circle cx="20" cy="5" r="2"/><circle cx="35" cy="20" r="2"/><circle cx="20" cy="35" r="2"/><circle cx="5" cy="20" r="2"/></g></svg>AW / 04</div>
+    <header><img class="brand-emblem" src="${brandMarks.emblem}" alt="Motorola 徽标">
     <div class="identity"><small>ACOUSTIC INSTRUMENT &nbsp; / &nbsp; WRIST ARRAY</small><b>声源定位手表 <i>/</i></b><small>AW–04 · INTERACTIVE FIELD SIMULATOR</small></div>
-    <div class="heads"><span><small>UNIT ID</small>AW04–SIM</span><span><small>RUNTIME</small><b id="clock"></b></span><span><small>STATUS</small><b id="mode"></b></span></div></header>
+    <div class="heads"><span><small>UNIT ID</small>AW04–SIM</span><span><small>RUNTIME</small><b id="clock"></b></span><span><small>STATUS</small><b id="mode"></b></span></div><img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
     <main><aside class="left">
     <article><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
     <article><h2>声音识别 <small>CLASSIFIER</small></h2><div class="readline"><strong id="className"></strong><span id="classMode">端侧 AI<br>模板模拟</span></div><canvas id="graph" width="560" height="64"></canvas><div class="haptic-settings"><h2>声音与振感 <small>HAPTICS</small></h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ 自定义声音</button>'}
@@ -32,7 +33,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     <article><h2>声源场景 <small>SOURCES</small></h2><div class="options"></div><div class="slider"><label for="bearing">方位角</label><input id="bearing" type="range" min="0" max="359" step="1" value="48"></div></article>
     <article><h2>显示控制 <small>DISPLAY</small></h2><nav class="tabs" aria-label="拆解章节">${tabButtons}</nav><div class="ltoggle"><button id="labelSwitch" aria-pressed="true">部件标注</button></div></article>
     <article><h2>部件索引 <small>ASSEMBLIES</small></h2><div class="partlist">${parts.map((s,i)=>'<button data-part="'+i+'"><i></i><b>'+s+'</b><span>0'+(i+1)+'</span></button>').join('')}</div></article></aside></main>
-    <footer><div class="consolefoot"><div class="trackinfo"><h2>导览记录 <small>SEQUENCE LOG</small></h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="暂停自动导览"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div><div class="footline"><span>FIELD SIMULATOR &nbsp; / &nbsp; CONCEPT STUDY</span><span>AW–04 &nbsp; · &nbsp; ACOUSTIC SYSTEMS</span></div></footer>`);
+    <footer><div class="consolefoot"><div class="trackinfo"><h2>导览记录 <small>SEQUENCE LOG</small></h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="暂停自动导览"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div><div class="footline"><img class="brand-hackathon" src="${brandMarks.hackathon}" alt="hackathon"><span>AW–04 &nbsp; · &nbsp; ACOUSTIC SYSTEMS</span></div></footer>`);
   const $=s=>app.querySelector(s),$$=s=>[...app.querySelectorAll(s)];
   const stage=$('#stage');stage.prepend(canvas);
   const leaders=document.createElement('canvas');leaders.className='leaders';stage.append(leaders);const legend=leaders.getContext('2d');
