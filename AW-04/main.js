@@ -19,8 +19,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
   app.insertAdjacentHTML('beforeend',`
     <header><img class="brand-emblem" src="${brandMarks.emblem}" alt="Motorola 徽标">
-    <div class="identity"><small>ACOUSTIC INSTRUMENT &nbsp; / &nbsp; WRIST ARRAY</small><b>声源定位手表 <i>/</i></b><small>AW–04 · INTERACTIVE FIELD SIMULATOR</small></div>
-    <div class="heads"><span><small>UNIT ID</small>AW04–SIM</span><span><small>RUNTIME</small><b id="clock"></b></span><span><small>STATUS</small><b id="mode"></b></span></div><img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
+    <img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
     <main><aside class="left">
     <article class="bearing-panel"><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
     <article><h2>声音识别 <small>CLASSIFIER</small></h2><div class="readline"><strong id="className"></strong><span id="classMode">端侧 AI<br>模板模拟</span></div><canvas id="graph" width="560" height="64"></canvas><div class="haptic-settings"><h2>声音与振感 <small>HAPTICS</small></h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ 自定义声音</button>'}
@@ -234,7 +233,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     const w=$('#wave').getContext('2d');w.clearRect(0,0,500,100);w.strokeStyle='#8d81aa';w.lineWidth=1;w.beginPath();w.moveTo(0,50);w.lineTo(500,50);w.stroke();w.beginPath();
     for(let i=0;i<=500;i++){const u=i/500;let sum=0;s.spectrum.forEach((amp,k)=>sum+=amp*Math.sin(u*(25+k*13)-t*(4+k*.45)));const y=50+sum*15*(.22+.78*Math.pow(Math.sin(u*Math.PI*2.4-t),4));if(i===0)w.moveTo(i,y);else w.lineTo(i,y);}w.strokeStyle='#d3baff';w.lineWidth=2.6;w.stroke();
     $('.play').textContent=manual?'▶':'Ⅱ';$('.play').setAttribute('aria-label',manual?'重新播放自动导览':'暂停自动导览');
-    $('#mode').textContent=manual?'MANUAL':'AUTO TOUR';const playhead=manual?savedTime:t;$('#clock').textContent='00:00:'+String(Math.floor(playhead)).padStart(2,'0');
+    const playhead=manual?savedTime:t;
     $('#trackTime').textContent=String(Math.floor(playhead)).padStart(2,'0')+' / '+tl.duration+' s';$('.progress i').style.width=(playhead/tl.duration*100)+'%';
     $('.stagehint').textContent=film?'MODEL  /  AW–04':'拖动旋转 · 滚轮缩放';
     const sound = s.detected.en;
