@@ -29,6 +29,51 @@ function consolidate(g){
     const pool=pools.get(o.material)||[];pool.push(geom);pools.set(o.material,pool);children.push(o);});
   g.clear();for(const [m,geos] of pools){mesh(g,mergeGeometries(geos),m);geos.forEach(v=>v.dispose());}children.forEach(o=>o.geometry.dispose());
 }
+// Coin LRA with an in-plane moving mass. The cap comes off for the section view.
+function buildActuator(root){
+  const layer=group(root),housing=group(layer),mover=group(layer),springs=group(layer),cap=group(layer);
+  const copper=mat('#ad674e',.78,.38),steel=mat('#a9a9b6',.86,.42);
+  disc(housing,3.85,.12,black,0,0,-1.59); // Adhesive foot against the back cover.
+  disc(housing,3.98,.22,graphite,0,0,-1.42);
+  ring(housing,3.64,4,-1.38,1.36,ti,.09);
+  for(let i=0;i<9;i++)ring(housing,1.36+i*.118,1.46+i*.118,-1.28,-.72,copper,.025);
+  box(housing,2.45,1.05,.14,.12,violet,4.35,0,-1.05);
+  for(const side of [-1,1]){
+    box(housing,.90,.24,.12,.04,bright,4.70,side*.25,-.95);
+    // Folded leaf springs join the moving bridge to the can on either side.
+    for(const y of [-.88,.88]){
+      const path=[[side*1.94,y],[side*2.37,y+.26],[side*2.74,y-.25],[side*3.05,y+.21],[side*3.63,y]];
+      for(let i=1;i<path.length;i++){
+        const [x0,y0]=path[i-1],[x1,y1]=path[i];
+        const leaf=box(springs,Math.hypot(x1-x0,y1-y0)+.06,.12,.27,.04,steel,(x0+x1)/2,(y0+y1)/2,.13);
+        leaf.rotation.z=Math.atan2(y1-y0,x1-x0);
+      }
+    }
+    box(mover,1.07,3.44,1.00,.2,steel,side*1.47,0,.17);
+  }
+  box(mover,2.1,1.36,.80,.16,graphite,0,0,.18);
+  box(mover,1.56,.75,.12,.08,violet,0,0,.63);
+  disc(cap,3.96,.26,bright,0,0,1.52);
+  disc(cap,3.55,.04,ti,0,0,1.66);
+  painted(cap,256,c=>{c.fillStyle='#edebf4';c.textAlign='center';c.font='bold 66px monospace';c.fillText('LRA',128,143);c.font='23px monospace';c.fillText('AW / 08',128,183);},0,0,1.69,5.3);
+  for(const g of [housing,mover,springs,cap])consolidate(g);
+  const springMesh=springs.children[0];
+  const positions=springMesh.geometry.attributes.position;
+  const bent=positions.clone();
+  for(let i=0;i<bent.count;i++){
+    const weight=T.MathUtils.clamp((3.63-Math.abs(positions.getX(i)))/(3.63-1.94),0,1);
+    bent.setY(i,positions.getY(i)+.23*weight);
+  }
+  springMesh.geometry.morphAttributes.position=[bent];
+  springMesh.updateMorphTargets();
+  return {layer,update(section,pulse,elapsed){
+    cap.visible=!section;
+    // Slow the carrier so its direction is readable; preserve the actual pulse envelope.
+    const phase=section && pulse>=0 ? Math.sin(elapsed*.032) : 0;
+    mover.position.y=.23*phase;
+    springMesh.morphTargetInfluences[0]=phase;
+  }};
+}
 export function buildWatch(){
   const root=group(),base=group(root),battery=group(root),pcb=group(root),array=group(root),display=group(root),bezel=group(root),back=group(root);
   // Articulated bracelet follows the wrist ellipse; individual rows share hinge lines.
@@ -58,10 +103,12 @@ export function buildWatch(){
   for(let i=0;i<28;i++){let a=i*tau/28;const rib=box(crown,.34,.33,2.8,.1,bright,Math.sin(a)*2.78,Math.cos(a)*2.78,0);rib.rotation.z=-a;}
   disc(back,19.88,1.15,brushed,0,0,-5.6);disc(back,15.5,.8,graphite,0,0,-6.43);disc(back,10.5,.35,ti,0,0,-6.96);
   for(let i=0;i<6;i++){let a=i*tau/6;screw(back,18*Math.cos(a),18*Math.sin(a),-6.20);}
-  disc(battery,15.85,2.75,brushed,0,0,-3.42);disc(battery,15.25,.24,ti,0,0,-1.94);
-  box(battery,5,3,.38,.4,violet,1,14.5,-1.78);
-  painted(battery,256,(c,n)=>{c.fillStyle='#494959';c.textAlign='center';c.font='600 36px monospace';c.fillText('Li-ion',n/2,115);c.font='20px monospace';c.fillText('AW / CELL',n/2,155);},0,0,-1.78,20);
+  disc(battery,12.8,2.75,brushed,-5,0,-3.42);disc(battery,12.2,.24,ti,-5,0,-1.94);
+  box(battery,5,3,.38,.4,violet,-5,11.2,-1.78);
+  painted(battery,256,(c,n)=>{c.fillStyle='#494959';c.textAlign='center';c.font='600 36px monospace';c.fillText('Li-ion',n/2,115);c.font='20px monospace';c.fillText('AW / CELL',n/2,155);},-5,0,-1.78,17);
   disc(pcb,17.6,1.0,boardMat,0,0,-1.03);
+  // Spring contacts meet the two LRA flex pads when the board is seated.
+  for(const y of [-.25,.25])disc(pcb,.11,2.735,bright,17.05,y,-2.8975,16);
   for(let j=0;j<4;j++){const a=(j+.5)*tau/4;
     disc(pcb,1.13,.10,ti,15.8*Math.sin(a),15.8*Math.cos(a),-.46,24);
     disc(pcb,.68,.13,black,15.8*Math.sin(a),15.8*Math.cos(a),-.43,20);}
@@ -122,5 +169,7 @@ export function buildWatch(){
     for(let j=-2;j<=2;j++)box(g,.15,.71,.08,.04,brushed,j*.50,19.1,5.93);}
   const layers=[base,back,battery,pcb,array,display,bezel];
   layers.forEach(consolidate);
-  return {root,layers,dial,pcb,array,display,hardware};
+  const actuator=buildActuator(root);
+  layers.push(actuator.layer);
+  return {root,layers,dial,pcb,array,display,hardware,actuator};
 }

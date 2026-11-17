@@ -55,7 +55,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   let W=1,H=1,manual=false,idle=0,current={stage:0,src:0,bearing:48,explode:0},stageId=-1,sel=-1,lastSound=-1;
   let savedTime=0,rx=0,ry=0,zoom=1,drag=null,lastT=0,tourOffset=0,opening=null;
   function user(){if(!manual)savedTime=(lastT-tourOffset+tl.duration)%tl.duration;manual=true;idle=performance.now();}
-  function setStage(i){user();sel=-1;rx=ry=0;zoom=1;opening=i===1?performance.now():null;current={...current,stage:i,explode:i===1?0:1};}
+  function setStage(i){user();if(i===5)replay=true;sel=-1;rx=ry=0;zoom=1;opening=i===1?performance.now():null;current={...current,stage:i,explode:i===1?0:1};}
   $$('.tabs button').forEach((button,i)=>button.onclick=()=>setStage(i));
   let lastDetection = '', lastTourCue = -1, pulseStart = -Infinity, replay = false;
   const feedback = $('#hapticFeedback');
@@ -148,7 +148,14 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   $('#bearing').oninput=e=>{user();current.bearing=+e.target.value;};
   let labels=true;
   $('#labelSwitch').onclick=()=>{user();labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
-  $$('.partlist button').forEach((btn,i)=>btn.onclick=()=>{const next=sel===i?-1:i;setStage(1);sel=next;current.explode=1;opening=null;});
+  $$('.partlist button').forEach((button,i)=>button.onclick=()=>{
+    const selected=sel===i || (current.stage===5 && i===7);
+    if(i===7 && !selected){setStage(5);return;}
+    setStage(1);
+    sel=selected?-1:i;
+    current.explode=1;
+    opening=null;
+  });
   function restart(){manual=false;tourOffset=lastT-savedTime;stageId=-1;sel=-1;rx=ry=0;zoom=1;opening=null;}
   $('.play').onclick=()=>manual?restart():user();
   canvas.onpointerdown=e=>{user();drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};
@@ -157,19 +164,23 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   canvas.addEventListener('wheel',e=>{e.preventDefault();user();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
   app.addEventListener('pointerdown',e=>{if(!e.target.closest('.play')&&!film)user();});
   window.addEventListener('keydown',e=>{if(film||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('dialog'))return;if(e.target.matches('input,select')||((e.key===' '||e.key==='Enter')&&e.target.matches('button')))return;
-    if(/^[1-5]$/.test(e.key)){setStage(+e.key-1);}else if(e.key===' '){manual?restart():user();}else if(e.key.startsWith('Arrow')){user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;}else return;e.preventDefault();e.stopImmediatePropagation();},true);
+    if(/^[1-6]$/.test(e.key)){setStage(+e.key-1);}else if(e.key===' '){manual?restart():user();}else if(e.key.startsWith('Arrow')){user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;}else return;e.preventDefault();e.stopImmediatePropagation();},true);
   function resize(){W=stage.clientWidth;H=stage.clientHeight;if(W&&H)renderer.setSize(W,H,false);}
   new ResizeObserver(resize).observe(stage);
-  const explodeOffsets=[0,-9,10,24,38,52,65];
+  const explodeOffsets=[0,-9,10,24,38,52,65,0];
   function pose(c,t){
     const id=c.stage,ex=id===1&&sel<0?c.explode:0,angle=t*.45;
     let yaw=-.62+.11*Math.sin(angle),pitch=.13+.06*Math.sin(angle*.55),roll=-.17;
     if(id===1){yaw=T.MathUtils.lerp(-.66,.88+.075*Math.sin(angle),ex);pitch=T.MathUtils.lerp(.14,-.61,ex);roll=T.MathUtils.lerp(-.17,.13,ex);}
     if(id===2||id===3||sel>=0){yaw=-.23+.21*Math.sin(angle*.55);pitch=.28;roll=-.10;}
+    if(id===5){yaw=-.22;pitch=-.55;roll=-.12;}
     if(id===4){yaw=.12*Math.cos(angle*.60);pitch=.035;roll=.025;}
     watch.root.rotation.set(pitch+rx,yaw+ry,roll,'YXZ');
-    const focus=id===1?sel:id===2?4:id===3?3:-1;
+    const focus=id===1?sel:id===2?4:id===3?3:id===5?7:-1;
     watch.layers.forEach((g,i)=>{g.visible=focus<0||focus===i;g.position.z=explodeOffsets[i]*ex;});
+    // Follow the back cover out of the battery bay before passing the case rim.
+    const outward=T.MathUtils.smoothstep(ex,.58,1);
+    watch.actuator.layer.position.set(12.35+30*outward,-12*outward,-3.375-6.4*ex);
     watch.hardware(ex,focus);watch.root.updateMatrixWorld(true);
     const bounds=new T.Box3().makeEmpty(),v=new T.Vector3();
     watch.layers.forEach((g,i)=>{if(g.visible)for(const p of samples[i])bounds.expandByPoint(v.copy(p).applyMatrix4(g.matrixWorld));});
@@ -183,13 +194,13 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       const dpr=Math.min(devicePixelRatio,2);
       if(leaders.width!==Math.round(W*dpr)||leaders.height!==Math.round(H*dpr)){leaders.width=Math.round(W*dpr);leaders.height=Math.round(H*dpr);}
       legend.setTransform(dpr,0,0,dpr,0,0);legend.clearRect(0,0,W,H);
-      const points=[[15,-13,0],[-8,-10,-6],[13,-9,-2],[13,-8,-.5],[14,-9,1.7],[14,-8,3.9],[17,-8,5.7]];
+      const points=[[15,-13,0],[-8,-10,-6],[4,-8,-2],[13,-8,-.5],[14,-9,1.7],[14,-8,3.9],[17,-8,5.7],[0,0,1.69]];
       const anchors=points.map((p,i)=>{v.fromArray(p).applyMatrix4(watch.layers[i].matrixWorld).project(camera);return {x:(v.x+1)*W/2,y:(1-v.y)*H/2,i};}).sort((a,b)=>a.y-b.y);
       legend.font=W<480?'500 11px "PingFang SC", sans-serif':'500 13px "PingFang SC", sans-serif';
       const labelWidth=Math.max(...parts.map(name=>legend.measureText(name).width));
       const end=Math.min(W*.865,W-labelWidth-14);let prev=-50;
       for(const {x,y,i} of anchors){const yy=Math.max(y,prev+23);prev=yy;
-        legend.beginPath();legend.moveTo(x,y);legend.lineTo(Math.max(x+8,end-30),yy);legend.lineTo(end,yy);legend.strokeStyle='#777288';legend.lineWidth=.9;legend.stroke();
+        legend.beginPath();legend.moveTo(x,y);legend.lineTo(Math.max(x+8,end-30),yy);legend.lineTo(end,yy);legend.strokeStyle=i===7?'#6740aa':'#777288';legend.lineWidth=i===7?1.8:.9;legend.stroke();
         legend.beginPath();legend.arc(x,y,2.3,0,7);legend.fillStyle='#6551a8';legend.fill();
         legend.fillStyle='#484458';legend.fillText(parts[i],end+7,yy+4);}
     }
@@ -209,10 +220,10 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     if(!manual){const a=tour(t);current={...a,bearing:sounds[a.src].angle};}
     if(manual&&opening!==null){const x=Math.min(1,(performance.now()-opening)/1450);current.explode=x*x*(3-2*x);if(x===1)opening=null;}
     const c=current,id=c.stage,s=acousticState(c.src,c.bearing,t,catalog);
-    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
+    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','线性振动器'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
       $('#fig').textContent='FIG. 0'+(id+1);$$('.tabs button').forEach((b,i)=>b.setAttribute('aria-pressed',i===id));}
     if(lastSound!==c.src){lastSound=c.src;$$('.options button').forEach((b,i)=>b.setAttribute('aria-pressed',c.src===i));}
-    $$('.partlist button').forEach((b,i)=>b.setAttribute('aria-pressed',sel===i||(id===2&&i===4)||(id===3&&i===3)));
+    $$('.partlist button').forEach((b,i)=>b.setAttribute('aria-pressed',sel===i||(id===2&&i===4)||(id===3&&i===3)||(id===5&&i===7)));
     $('#value').textContent=s.degree+'°';$('#className').textContent=s.detected.name;$('#sound').textContent=s.detected.custom ? '自定义场景' : s.detected.en;
     if (lastDetection.split('/')[0] !== s.detected.en) {
       $('#classMode').innerHTML = s.detected.custom ? '自定义<br>场景模拟' : '端侧 AI<br>模板模拟';
@@ -230,7 +241,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     const rhythmId = rhythmFor(s.detected);
     const rhythm = rhythms[rhythmId];
     const detection = sound + '/' + rhythmId;
-    const tourCue = t >= tl.beats.alarm ? tl.beats.alarm : t >= tl.beats.bird ? tl.beats.bird : t >= tl.beats.dial ? tl.beats.dial : 0;
+    const tourCue = t >= tl.beats.haptic ? tl.beats.haptic : t >= tl.beats.alarm ? tl.beats.alarm : t >= tl.beats.bird ? tl.beats.bird : t >= tl.beats.dial ? tl.beats.dial : 0;
     const newTourCue = !manual && tourCue !== lastTourCue;
     if (!manual) lastTourCue = tourCue;
     if (lastDetection !== detection || newTourCue || replay) {
@@ -252,6 +263,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     const elapsedMs = film ? (t - tourCue)*1000 : performance.now() - pulseStart;
     const pulse = activePulse(rhythm.timing, elapsedMs);
     for (let i = 0; i < pulseBars.children.length; i++) pulseBars.children[i].classList.toggle('playing', i === pulse);
+    watch.actuator.update(id===5,pulse,elapsedMs);
     watch.dial.update(s,rhythm,pulse);pose(c,t);renderer.render(scene,camera);
   }
   return {render,resize,warm:()=>renderer.compileAsync(scene,camera)};
