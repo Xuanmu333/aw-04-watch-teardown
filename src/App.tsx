@@ -16,12 +16,14 @@ export default function App() {
   if (reducedMotion) return null;
   return (
     <AsciiRain
-      headColor="#7463a7"
-      trailColor="#a39ac1"
-      glyphSize={13}
-      density={27}
-      speed={4.5}
-      trail={14}
+      headColor="#675580"
+      trailColor="#9b95b4"
+      glyphSize={12}
+      density={23}
+      speed={3.1}
+      trail={12}
+      glyphs="0123456789ABCDEF:."
+      shuffle={false}
       style={{ width: '100%', height: '100%' }}
     />
   );

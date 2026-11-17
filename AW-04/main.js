@@ -22,7 +22,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     <div class="identity"><small>ACOUSTIC INSTRUMENT &nbsp; / &nbsp; WRIST ARRAY</small><b>声源定位手表 <i>/</i></b><small>AW–04 · INTERACTIVE FIELD SIMULATOR</small></div>
     <div class="heads"><span><small>UNIT ID</small>AW04–SIM</span><span><small>RUNTIME</small><b id="clock"></b></span><span><small>STATUS</small><b id="mode"></b></span></div><img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
     <main><aside class="left">
-    <article><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
+    <article class="bearing-panel"><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
     <article><h2>声音识别 <small>CLASSIFIER</small></h2><div class="readline"><strong id="className"></strong><span id="classMode">端侧 AI<br>模板模拟</span></div><canvas id="graph" width="560" height="64"></canvas><div class="haptic-settings"><h2>声音与振感 <small>HAPTICS</small></h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ 自定义声音</button>'}
     <div class="haptic-readout"><span id="rhythmNow"></span><div id="pulses" aria-hidden="true"></div></div>
     <p id="hapticFeedback" role="status"></p></div></article>
@@ -185,8 +185,9 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       legend.setTransform(dpr,0,0,dpr,0,0);legend.clearRect(0,0,W,H);
       const points=[[15,-13,0],[-8,-10,-6],[13,-9,-2],[13,-8,-.5],[14,-9,1.7],[14,-8,3.9],[17,-8,5.7]];
       const anchors=points.map((p,i)=>{v.fromArray(p).applyMatrix4(watch.layers[i].matrixWorld).project(camera);return {x:(v.x+1)*W/2,y:(1-v.y)*H/2,i};}).sort((a,b)=>a.y-b.y);
-      const end=W*.865;let prev=-50;
-      legend.font='500 13px "PingFang SC", sans-serif';
+      legend.font=W<480?'500 11px "PingFang SC", sans-serif':'500 13px "PingFang SC", sans-serif';
+      const labelWidth=Math.max(...parts.map(name=>legend.measureText(name).width));
+      const end=Math.min(W*.865,W-labelWidth-14);let prev=-50;
       for(const {x,y,i} of anchors){const yy=Math.max(y,prev+23);prev=yy;
         legend.beginPath();legend.moveTo(x,y);legend.lineTo(Math.max(x+8,end-30),yy);legend.lineTo(end,yy);legend.strokeStyle='#777288';legend.lineWidth=.9;legend.stroke();
         legend.beginPath();legend.arc(x,y,2.3,0,7);legend.fillStyle='#6551a8';legend.fill();
@@ -218,9 +219,9 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     }
     $('#bearing').value=Math.round(s.angle)%360;azimuth(s);
     $$('.cellrow').forEach((row,i)=>{row.querySelector('em').style.width=(2+s.delays[i]/101*98)+'%';row.querySelector('span').textContent=Math.round(s.delays[i])+' μs';});
-    spec.clearRect(0,0,560,64);s.spectrum.forEach((v,i)=>{for(let j=0;j<8;j++){spec.fillStyle=j<Math.round(v*8)?'#7961ba':'#e3e0dd';spec.fillRect(i*71,57-j*7,56,5);}});
-    const w=$('#wave').getContext('2d');w.clearRect(0,0,500,100);w.strokeStyle='#a99bcc';w.lineWidth=1;w.beginPath();w.moveTo(0,50);w.lineTo(500,50);w.stroke();w.beginPath();
-    for(let i=0;i<=500;i++){const u=i/500;let sum=0;s.spectrum.forEach((amp,k)=>sum+=amp*Math.sin(u*(25+k*13)-t*(4+k*.45)));const y=50+sum*15*(.22+.78*Math.pow(Math.sin(u*Math.PI*2.4-t),4));if(i===0)w.moveTo(i,y);else w.lineTo(i,y);}w.strokeStyle='#7760b3';w.lineWidth=2;w.stroke();
+    spec.clearRect(0,0,560,64);s.spectrum.forEach((v,i)=>{for(let j=0;j<8;j++){spec.fillStyle=j<Math.round(v*8)?'#8264bf':'#cbcddd';spec.fillRect(i*71,57-j*7,56,5);}});
+    const w=$('#wave').getContext('2d');w.clearRect(0,0,500,100);w.strokeStyle='#8d81aa';w.lineWidth=1;w.beginPath();w.moveTo(0,50);w.lineTo(500,50);w.stroke();w.beginPath();
+    for(let i=0;i<=500;i++){const u=i/500;let sum=0;s.spectrum.forEach((amp,k)=>sum+=amp*Math.sin(u*(25+k*13)-t*(4+k*.45)));const y=50+sum*15*(.22+.78*Math.pow(Math.sin(u*Math.PI*2.4-t),4));if(i===0)w.moveTo(i,y);else w.lineTo(i,y);}w.strokeStyle='#d3baff';w.lineWidth=2.6;w.stroke();
     $('.play').textContent=manual?'▶':'Ⅱ';$('.play').setAttribute('aria-label',manual?'重新播放自动导览':'暂停自动导览');
     $('#mode').textContent=manual?'MANUAL':'AUTO TOUR';const playhead=manual?savedTime:t;$('#clock').textContent='00:00:'+String(Math.floor(playhead)).padStart(2,'0');
     $('#trackTime').textContent=String(Math.floor(playhead)).padStart(2,'0')+' / '+tl.duration+' s';$('.progress i').style.width=(playhead/tl.duration*100)+'%';
