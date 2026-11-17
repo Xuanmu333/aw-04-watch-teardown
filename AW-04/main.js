@@ -2,6 +2,7 @@ import * as T from 'three';
 import brandMarks from './brand-marks.json';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {runSim} from 'teardown-kit/runtime.js';
+import {createTunnel} from './tunnel.js';
 import {buildWatch} from './watch.js';
 import {sounds,acousticState,microphones} from './acoustics.js';
 import {chapters,parts,tour,tl} from './story.js';
@@ -19,6 +20,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
   app.insertAdjacentHTML('beforeend',`
     <header><img class="brand-emblem" src="${brandMarks.emblem}" alt="Motorola 徽标">
+    <p class="product-title"><strong>SoudBridge</strong>，为听障人士设计的环境感知手表。</p>
     <img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
     <main><aside class="left">
     <article class="bearing-panel"><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
@@ -27,7 +29,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     <p id="hapticFeedback" role="status"></p></div></article>
     <article><h2>麦克风阵列 <small>MIC ARRAY</small></h2><div class="channels">${microphones.map((_,i)=>'<div class="cellrow"><b>M0'+(i+1)+'</b><i><em></em></i><span></span></div>').join('')}</div><div class="footpair"><span>相对首达时间</span><b>Δt / μs</b></div></article>
     </aside>
-    <section id="stage" aria-label="可旋转的三维手表"><div class="orbits"><i></i><i></i><i></i></div><div class="axisticks"></div><div class="caption"><span>PROJECTION / ORTHO</span><b id="fig"></b></div><div class="stagecopy"><small>VIEW STATE</small><h1></h1><div class="english"></div></div><div class="stagehint"></div></section>
+    <section id="stage" aria-label="可旋转的三维手表"><div class="stage-axes" aria-hidden="true"></div><div class="axisticks"></div><div class="stagecopy"><small>VIEW STATE</small><h1></h1><div class="english"></div></div></section>
     <aside class="rightside"><article><h2>定位读数 <small>POSITION</small></h2><div class="radarbox"><canvas class="polar" width="180" height="180"></canvas><dl><dt>对置间距</dt><dd>34 mm</dd><dt>平面阵列</dt><dd>4 CH</dd><dt>表壳直径</dt><dd>42 mm</dd></dl></div></article>
     <article><h2>声源场景 <small>SOURCES</small></h2><div class="options"></div><div class="slider"><label for="bearing">方位角</label><input id="bearing" type="range" min="0" max="359" step="1" value="48"></div></article>
     <article><h2>显示控制 <small>DISPLAY</small></h2><nav class="tabs" aria-label="拆解章节">${tabButtons}</nav><div class="ltoggle"><button id="labelSwitch" aria-pressed="true">部件标注</button></div></article>
@@ -40,6 +42,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const renderer=new T.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});
   renderer.setClearColor(0,0);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.92;
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.65));
+  const drawTunnel=createTunnel(document.querySelector('#tunnel-background'),tl.duration);
   const scene=new T.Scene(),camera=new T.OrthographicCamera(-40,40,40,-40,.1,500);
   camera.position.z=180;
   const studio=new RoomEnvironment(),pm=new T.PMREMGenerator(renderer),env=pm.fromScene(studio,.025);
@@ -228,7 +231,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     if(manual&&opening!==null){const x=Math.min(1,(performance.now()-opening)/1450);current.explode=x*x*(3-2*x);if(x===1)opening=null;}
     const c=current,id=c.stage,s=acousticState(c.src,c.bearing,t,catalog);
     if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','线性振动器'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
-      $('#fig').textContent='FIG. 0'+(id+1);$$('.tabs button').forEach((b,i)=>b.setAttribute('aria-pressed',i===id));}
+      $$('.tabs button').forEach((b,i)=>b.setAttribute('aria-pressed',i===id));}
     if(lastSound!==c.src){lastSound=c.src;$$('.options button').forEach((b,i)=>b.setAttribute('aria-pressed',c.src===i));}
     $$('.partlist button').forEach((b,i)=>b.setAttribute('aria-pressed',sel===i||(id===2&&i===4)||(id===3&&i===3)||(id===5&&i===7)));
     $('#value').textContent=s.degree+'°';$('#className').textContent=s.detected.name;$('#sound').textContent=s.detected.custom ? '自定义场景' : s.detected.en;
@@ -243,7 +246,6 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     $('.play').textContent=manual?'▶':'Ⅱ';$('.play').setAttribute('aria-label',manual?'重新播放自动导览':'暂停自动导览');
     const playhead=manual?savedTime:t;
     $('#trackTime').textContent=String(Math.floor(playhead)).padStart(2,'0')+' / '+tl.duration+' s';$('.progress i').style.width=(playhead/tl.duration*100)+'%';
-    $('.stagehint').textContent=film?'MODEL  /  AW–04':'拖动旋转 · 滚轮缩放';
     const sound = s.detected.en;
     const rhythmId = rhythmFor(s.detected);
     const rhythm = rhythms[rhythmId];
@@ -274,6 +276,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     watch.actuator.update(id===5,drive);
     watch.dial.update(s);
     pose(c,manual && id===0 ? savedTime : t,drive);
+    drawTunnel(raw);
     renderer.render(scene,camera);
   }
   return {render,resize,warm:()=>renderer.compileAsync(scene,camera)};

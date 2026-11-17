@@ -16,4 +16,4 @@
 - [观看或下载演示视频](teardown-out/AW-04.mp4)，28 秒，1920 × 1080，60 fps，含同步音效。
 - [查看模型、声学模拟和动画源码](AW-04/)。
 
-本地开发使用 Node.js 22.12 或以上版本。运行 `npm ci`、`npm run dev` 可预览手表与浅紫色 ASCII Rain 背景。运行 `npm run build` 会生成网站首页，并更新可直接打开的离线 HTML。
+本地开发使用 Node.js 22.12 或以上版本。运行 `npm ci`、`npm run dev` 可预览搭配浅紫色 Tunnel Wrap 粒子背景的手表工作台。运行 `npm run build` 会生成网站首页，并更新可直接打开的离线 HTML。
