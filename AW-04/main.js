@@ -75,7 +75,13 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
           <div><dt>Source direction</dt><dd id="overviewBearing"></dd></div>
           <div><dt>Wrist rhythm</dt><dd id="overviewRhythm"></dd></div>
         </dl>
-        <details class="hardware-haptics haptic-settings"><summary>Sound &amp; vibration settings</summary><div id="rhythmRows"></div><button id="addSound">＋ Custom sound</button>
+        <details class="hardware-haptics haptic-settings"><summary>Sound &amp; vibration settings</summary>
+          <div class="bearing-demo">
+            <label for="demoBearing">Source angle</label>
+            <input id="demoBearing" type="range" min="0" max="359" step="1" value="48">
+            <button type="button" id="playBearing">Play sweep</button>
+          </div>
+          <div id="rhythmRows"></div><button id="addSound">＋ Custom sound</button>
           <div class="haptic-readout"><span id="rhythmNow"></span><div id="pulses" aria-hidden="true"></div></div>
           <p id="hapticFeedback" role="status"></p></details>
       </section>
@@ -108,7 +114,20 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
   let lab=null,labDial=null,lastLabResult=null,useLabResult=false,labClock=0;
   const motion=createSceneMotion({app,stage,canvas,hardware,labHost});
+  const bearingSlider = $('#demoBearing'), sweepButton = $('#playBearing');
+  let demoAngle = null, sweepStart = null;
+  function setAngleDemo(angle, play = false) {
+    demoAngle = angle;
+    sweepStart = play ? performance.now() : null;
+    sweepButton.textContent = play ? 'Pause sweep' : 'Play sweep';
+  }
+  bearingSlider.oninput = () => setAngleDemo(bearingSlider.valueAsNumber);
+  sweepButton.onclick = () => setAngleDemo(bearingSlider.valueAsNumber, sweepStart === null);
+  $('.hardware-haptics').addEventListener('toggle', event => {
+    if (!event.currentTarget.open) setAngleDemo(null);
+  });
   function selectPage(page,exploded=false){
+    setAngleDemo(null);
     stopPreview(); sel=-1; drag=null; rx=ry=0; zoom=1;
     if(page==='lab'){
       if(!lab)lab=createSoundLab(labHost,{onDialState:state=>{
@@ -153,6 +172,7 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   }
   function selectSound(index) {
     stopPreview();
+    setAngleDemo(null);
     useLabResult=false;
     current.src = index;
     current.bearing = catalog[index].angle;
@@ -231,7 +251,10 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   drawSoundControls();
   $('.haptic-settings').addEventListener('keydown', event => event.stopPropagation());
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopPreview();
+    if (document.hidden) {
+      stopPreview();
+      if (sweepStart !== null) setAngleDemo(bearingSlider.valueAsNumber);
+    }
   });
   let labels=true;
   $('#labelSwitch').onclick=()=>{labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
@@ -379,9 +402,17 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
       return;
     }
     const lastReading=useLabResult&&lastLabResult;
-    const s=lastReading||acousticState(c.src,c.bearing,t,catalog);
+    const angle = sweepStart === null ? demoAngle : (demoAngle + (performance.now() - sweepStart) * .036) % 360;
+    const source = lastReading ? catalog.indexOf(lastReading.detected) : c.src;
+    const s = (angle === null && lastReading) || acousticState(source, angle ?? c.bearing, t, catalog);
     const direction=s.hasBearing===false?'Undetermined':s.degree+'°';
-    const origin=lastReading?'Latest Sound Lab reading':'Example reading';
+    const origin=angle !== null ? 'Source direction demo' : lastReading?'Latest Sound Lab reading':'Example reading';
+    if (app.dataset.page === 'overview') {
+      const value = s.hasBearing === false ? 0 : Number(s.degree);
+      if (bearingSlider.valueAsNumber !== value) bearingSlider.valueAsNumber = value;
+      const description = value + ' degrees clockwise from 12 o’clock';
+      if (bearingSlider.getAttribute('aria-valuetext') !== description) bearingSlider.setAttribute('aria-valuetext', description);
+    }
     if($('#overviewBearing').textContent!==direction)$('#overviewBearing').textContent=direction;
     if($('#readingOrigin').textContent!==origin)$('#readingOrigin').textContent=origin;
     const sound = s.detected.en;
