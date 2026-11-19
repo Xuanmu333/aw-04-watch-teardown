@@ -84,7 +84,7 @@ export function createSoundLab(host, {onDialState,onTestVibration} = {}) {
   const receiver=one('.sl-watch');
   const dialTest=one('.sl-dial-test'), hapticStatus=one('.sl-field-foot [role=status]');
   const defaultStatus=hapticStatus.textContent;
-  let lastFrame=0,cycleStart=0,shownDialState,displayedSourcePhase;
+  let lastFrame=0,cycleStart=0,streamStart=0,shownDialState,displayedSourcePhase;
   const listening={listening:true,detected:{name:'Listening',en:'LISTENING'},angle:0,degree:'—',hasBearing:false};
   const nodes = new Map(sources.map(source => [source.id,{
     node:one('[data-lab-node="'+source.id+'"]'),
@@ -92,7 +92,7 @@ export function createSoundLab(host, {onDialState,onTestVibration} = {}) {
   }]));
   const modeButtons=all('[data-lab-mode]'), typeButtons=all('[data-lab-type]'), axes=all('[data-lab-axis]');
   const visibleSources = ()=>mode==='multi' ? sources : [selected];
-  let activeDrag=null,rangePointer=null;
+  let drag=null;
 
   function refresh() {
     model=analyzeScene(visibleSources());
@@ -143,49 +143,50 @@ export function createSoundLab(host, {onDialState,onTestVibration} = {}) {
     selected=sources[Number(button.dataset.labType)];
     refresh();
   }));
+  function moveSource(source,x,y) {
+    x=limit(x);y=limit(y);
+    if(source.x===x && source.y===y)return;
+    source.x=x;source.y=y;
+    if(drag)drag.moved=true;
+    streamStart=lastFrame;
+    refresh();
+  }
   axes.forEach(input=>{
     input.addEventListener('pointerdown',event=>{
-      if(event.button!==0)return;
-      rangePointer=event.pointerId;
-      replay();
+      if(event.button===0 && !drag)drag={id:event.pointerId,control:input,moved:false};
     });
     input.addEventListener('input',()=>{
-      selected[input.dataset.labAxis]=Number(input.value);
-      refresh();
+      const value=Number(input.value);
+      if(input.dataset.labAxis==='x')moveSource(selected,value,selected.y);
+      else moveSource(selected,selected.x,value);
     });
   });
-  function releaseRange(event) {
-    if(event.pointerId!==rangePointer)return;
-    rangePointer=null;
-    replay();
+  function release(event) {
+    if(event.pointerId!==drag?.id)return;
+    const {control,moved}=drag;
+    drag=null;
+    control.classList.remove('sl-dragging');
+    if(moved){streamStart=lastFrame;replay();}
   }
-  window.addEventListener('pointerup',releaseRange);
-  window.addEventListener('pointercancel',releaseRange);
+  window.addEventListener('pointerup',release);
+  window.addEventListener('pointercancel',release);
+  window.addEventListener('lostpointercapture',release);
   for (const source of sources) {
     const {node,row}=nodes.get(source.id);
     row.addEventListener('click',()=>{selected=source; refresh();});
     node.addEventListener('focus',()=>{if(selected!==source){selected=source;refresh();}});
     node.addEventListener('pointerdown',event=>{
-      if (event.button!==0 || activeDrag) return;
+      if (event.button!==0 || drag) return;
       node.focus({preventScroll:true});
-      selected=source;
-      activeDrag={id:event.pointerId,source,x:event.clientX,y:event.clientY,sx:source.x,sy:source.y};
+      drag={id:event.pointerId,control:node,moved:false,x:event.clientX,y:event.clientY,sx:source.x,sy:source.y};
       node.setPointerCapture(event.pointerId);
       node.classList.add('sl-dragging');
-      refresh();
     });
     node.addEventListener('pointermove',event=>{
-      if (activeDrag?.id!==event.pointerId || activeDrag.source!==source) return;
+      if (drag?.id!==event.pointerId || drag.control!==node) return;
       const rect=plane.getBoundingClientRect();
-      source.x=limit(activeDrag.sx+2*axisLimit*(event.clientX-activeDrag.x)/rect.width);
-      source.y=limit(activeDrag.sy-2*axisLimit*(event.clientY-activeDrag.y)/rect.height);
-      refresh();
-    });
-    node.addEventListener('lostpointercapture',event=>{
-      if (activeDrag?.id!==event.pointerId) return;
-      activeDrag=null;
-      node.classList.remove('sl-dragging');
-      replay();
+      moveSource(source,drag.sx+2*axisLimit*(event.clientX-drag.x)/rect.width,
+        drag.sy-2*axisLimit*(event.clientY-drag.y)/rect.height);
     });
     node.addEventListener('keydown',event=>{
       const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,1],ArrowDown:[0,-1]}[event.key];
@@ -193,20 +194,19 @@ export function createSoundLab(host, {onDialState,onTestVibration} = {}) {
       event.preventDefault();
       const step=event.shiftKey ? .5 : .1;
       selected=source;
-      source.x=limit(source.x+delta[0]*step);
-      source.y=limit(source.y+delta[1]*step);
-      refresh();
+      moveSource(source,source.x+delta[0]*step,source.y+delta[1]*step);
     });
   }
 
   function render(timeSeconds) {
     lastFrame=timeSeconds;
-    const positioning=activeDrag!==null||rangePointer!==null;
+    const positioning=drag?.moved===true;
     const elapsed=positioning?0:Math.max(0,timeSeconds-cycleStart);
     const staticResult=reducedMotion.matches&&!positioning;
     waves.render(elapsed,staticResult);
     paths.render(elapsed,staticResult);
-    chipFlow.render(elapsed,staticResult);
+    // Replaying the analysis does not interrupt the microphones' live input.
+    chipFlow.render(elapsed,staticResult,positioning?0:timeSeconds-streamStart);
     pipeline.render(elapsed,staticResult);
     const complete=staticResult || elapsed>=OUTPUT_START;
     const sourcePhase=complete?'output':elapsed>=AI_START?'filtered':'receiving';

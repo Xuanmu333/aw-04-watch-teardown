@@ -48,13 +48,13 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
     <div id="teardown">
       <div class="vision-story">
         <section class="vision-panel" data-story="assembled" aria-labelledby="visionTitle">
-          <p class="story-kicker">SoudBridge</p>
+          <p class="story-kicker">The moment before hello</p>
           <h1 id="visionTitle" tabindex="-1">The world,<br><em>within reach.</em></h1>
-          <p class="story-body">A friend rings your doorbell. You feel a familiar rhythm on your wrist. One glance tells you where to turn.</p>
+          <p class="story-body">Designed for people who are deaf or hard of hearing, this watch lets you experience the world in a different way.</p>
           <button class="story-action" id="exploreWatch">Touch the dial to look inside <span aria-hidden="true">↗</span></button>
         </section>
         <section class="vision-panel" data-story="exploded" aria-labelledby="explodedTitle" inert>
-          <p class="story-kicker">SoudBridge / Exploded view</p>
+          <p class="story-kicker">Exploded view</p>
           <h2 id="explodedTitle" tabindex="-1">Inside the<br><em>sensation.</em></h2>
           <p class="story-body">Four microphones catch a sound a fraction of a second apart. A chip works out what it is and where it came from. A tiny vibrator brings that moment to your wrist.</p>
           <details class="parts-disclosure"><summary>Explore the eight parts</summary>
@@ -67,7 +67,7 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
       </div>
       <section id="stage" aria-label="3D watch. Drag to rotate or scroll to zoom."></section>
       <section class="overview-story" aria-labelledby="overviewTitle" inert>
-        <p class="story-kicker">SoudBridge / On the Wrist</p>
+        <p class="story-kicker">On the Wrist</p>
         <h1 id="overviewTitle">At a <em>glance.</em></h1>
         <p class="overview-intro" id="readingOrigin">Example reading</p>
         <dl class="overview-metrics">

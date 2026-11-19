@@ -5,7 +5,6 @@ import './chip-flow.css';
 
 const channels = ['M01','M02','M03','M04'];
 const svgNS = 'http://www.w3.org/2000/svg';
-const packetTail = .32;
 
 const vertexShader = `
   uniform vec2 viewport;
@@ -33,7 +32,7 @@ const vertexShader = `
       diameter=1.1+2.6*scatter.y+5.*glint;
     } else {
       int ch=int(position.x);
-      float front=waves[ch]-position.y, t=clamp(front,0.,1.);
+      float front=waves[ch]-position.y, t=fract(front);
       int i=ch*7;
       float u=t/joins[ch];
       if(t>joins[ch]){ i+=3; u=(t-joins[ch])/(1.-joins[ch]); }
@@ -52,7 +51,7 @@ const vertexShader = `
       diameter=mix(1.6+2.7*scatter.z+3.2*glint,clamp(viewport.x*.038,10.,34.),packet);
       // The leading point stays on the route. The packet tail extends back from it.
       p-=direction*.32*diameter*packet;
-      opacity=step(0.,front)*(1.-step(1.,front))*mix(.53+.46*scatter.x,1.,packet);
+      opacity=step(0.,front)*mix(.53+.46*scatter.x,1.,packet);
     }
     gl_Position=vec4(2.*p.x/viewport.x-1.,1.-2.*p.y/viewport.y,0.,1.);
     gl_PointSize=diameter*pixelRatio;
@@ -104,11 +103,11 @@ function starRenderer(canvas, curves, joins, waves) {
   }
   for(let ch=0;ch<4;ch++){
     for(let i=0;i<132;i++){
-      const t=i/131;
-      const offset=packetTail*(t+.030*Math.sin(8*Math.PI*t));
+      const t=i/132;
+      const offset=t+.030*Math.sin(8*Math.PI*t);
       point(ch,offset,0);
     }
-    for(let j=0;j<3;j++)point(ch,packetTail*j/3,2);
+    for(let j=0;j<3;j++)point(ch,j/3,2);
   }
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
@@ -267,23 +266,26 @@ export function createChipFlow(scene,chipMount){
     if(source)transferTime=Math.max(.08,AI_START-Math.max(...arrivals));
     lastStatic=false;lastDie='';
   }
-  function render(elapsed,reducedMotion){
+  function render(elapsed,reducedMotion,streamElapsed){
     if(!hasLayout||!arrivals.length||(reducedMotion&&lastStatic))return;
     const step=computeStep(reducedMotion?Infinity:elapsed);
     const received=[];
     for(let i=0;i<4;i++){
-      waves[i]=reducedMotion?2:(elapsed-arrivals[i])*(1+packetTail)/transferTime;
-      // The leading particle starts at zero; the last trails it by packetTail.
-      const visibility=waves[i]>=0 && waves[i]<1+packetTail?'visible':'hidden';
+      const age=streamElapsed-arrivals[i];
+      // Fill the route with the first arrival, then keep feeding it at the original cruising speed.
+      waves[i]=reducedMotion?1.29+i*.08:
+        age<transferTime?age/transferTime:1+((age-transferTime)*.72)%1;
+      const visibility=waves[i]>=0?'visible':'hidden';
       if(tracks[i].getAttribute('visibility')!==visibility)tracks[i].setAttribute('visibility',visibility);
-      received[i]=waves[i]>=1;
-      const input=received[i]?'active':'pending';
+      received[i]=reducedMotion||elapsed>=arrivals[i]+transferTime;
+      const input=waves[i]>=1?'active':'pending';
       if(inlets[i].dataset.carrying!==input)inlets[i].dataset.carrying=input;
       if(canvas.hidden) fallback[i].forEach((dot,j)=>{
-        const t=waves[i]-j*packetTail/(fallback[i].length-1);
-        const visible=t>=0 && t<1;
+        const front=waves[i]-j/fallback[i].length;
+        const visible=front>=0;
         dot.setAttribute('visibility',visible?'visible':'hidden');
         if(!visible)return;
+        const t=front%1;
         const join=joins[i], part=t>join?1:0;
         segments[i][part].getPoint(part?(t-join)/(1-join):t/join,sample);
         dot.setAttribute('cx',sample.x);dot.setAttribute('cy',sample.y);
