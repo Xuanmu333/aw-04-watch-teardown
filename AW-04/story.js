@@ -1,13 +1,13 @@
 import tl from './timeline.json';
 export const chapters=[
-  ['总成','OVERVIEW','声向仪','四枚麦克风记录声音抵达的先后。表盘用紫色扇区标出声音来自哪个方向。'],
-  ['分层','EXPLODED VIEW','沿轴拆解','八组部件展开。振动器从电池旁侧向移出，其底面固定在贴腕底盖上。'],
-  ['拾音','MICROPHONE ARRAY','四点拾音','同一声波先后抵达四枚麦克风。比较相对到达时间，便能估计平面方位。'],
-  ['识别','ON-DEVICE AI','辨认声音','端侧 AI 识别的模拟过程：将输入频带与声音模板比对，选出最接近的类别。'],
-  ['表盘','DIRECTIONAL DIAL','方向入表','表盘显示声音名称，紫色扇区指向声源。注意表壳和表带随声音节奏一起振动。'],
-  ['振动器','LINEAR RESONANT ACTUATOR','振动器剖视','移去顶盖，可见铜色线圈和银色动子。动子按所选节拍往复，振感经底盖传到手腕。']
+  ['Assembled','OVERVIEW','AW-04','Four microphones compare sound arrival times. The purple sector indicates the source direction.'],
+  ['Exploded','EXPLODED VIEW','Axial teardown','Eight assemblies separate. The actuator moves out beside the battery and mounts to the wrist-facing back cover.'],
+  ['Microphones','MICROPHONE ARRAY','Four-point capture','Arrival-time differences across four microphones estimate the sound source bearing.'],
+  ['AI','ON-DEVICE AI','Sound classification','On-device AI simulation compares the input spectrum with sound templates to find the closest match.'],
+  ['Dial','DIRECTIONAL DIAL','Source direction','The dial shows the sound type and direction. Select Test to preview its assigned vibration rhythm.'],
+  ['Actuator','LINEAR RESONANT ACTUATOR','Actuator section','With the cap removed, the coil and moving mass are visible. Select Test to preview how vibration reaches the wrist.']
 ];
-export const parts=['表壳与链带','底盖','电池','AI 计算板','四麦阵列','显示屏','表圈','振动器'];
+export const parts=['Case & bracelet','Back cover','Battery','AI board','Mic array','Display','Bezel','Actuator'];
 const b=tl.beats;
 export function tour(t){
   const stage=t<b.open?0:t<b.array?1:t<b.processor?2:t<b.dial?3:t<b.alarm?4:t<b.haptic?0:5;

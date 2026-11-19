@@ -1,10 +1,10 @@
 // Alternating motor-on and pause durations, in milliseconds.
 export const rhythms = {
-  single: {label:'一次短振', timing:[140]},
-  double: {label:'两次短振', timing:[160,220,160]},
-  long:   {label:'一次长振', timing:[650]},
-  triple: {label:'三次长振', timing:[420,220,420,220,420]},
-  off:    {label:'仅表盘提示', timing:[]}
+  single: {label:'1 short pulse', timing:[140]},
+  double: {label:'2 short pulses', timing:[160,220,160]},
+  long:   {label:'1 long pulse', timing:[650]},
+  triple: {label:'3 long pulses', timing:[420,220,420,220,420]},
+  off:    {label:'Display only', timing:[]}
 };
 
 const defaults = {DOORBELL:'double', HORN:'single', ALARM:'triple'};

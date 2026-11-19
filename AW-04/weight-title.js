@@ -2,19 +2,21 @@
 export function bindWeightTitle(title) {
   const text = title.textContent;
   title.setAttribute('aria-label', text);
-  const name = document.createElement('span');
-  name.className = 'product-name';
-  name.setAttribute('aria-hidden', 'true');
-  const letters = [...text].map(char => {
-    const letter = document.createElement('span');
-    letter.className = 'weight-letter';
-    letter.textContent = char;
-    letter.setAttribute('aria-hidden', 'true');
-    return letter;
+  const letters = [];
+  const words = text.split(' ').map((word, index) => {
+    const group = document.createElement('span');
+    group.className = 'title-word';
+    group.setAttribute('aria-hidden', 'true');
+    for (const char of word) {
+      const letter = document.createElement('span');
+      letter.className = 'weight-letter';
+      letter.textContent = char;
+      group.append(letter);
+      letters.push(letter);
+    }
+    return index ? [document.createTextNode(' '), group] : [group];
   });
-  const split = text.indexOf('，') + 1;
-  name.append(...letters.slice(0, split));
-  title.replaceChildren(name, ...letters.slice(split));
+  title.replaceChildren(...words.flat());
 
   const enabled = matchMedia('(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference)');
   const factors = letters.map(() => 0);

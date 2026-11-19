@@ -50,9 +50,6 @@ for pitch in (400, 500):
 for k in range(5):
     event(beat["alarm"]+.12+k*.46,.25,lambda t:.20*math.sin(math.pi*min(1,t/.25))**.55*(
         math.sin(tau*880*t)+.25*math.sin(tau*1760*t)),.30)
-# A quiet audible analogue of the three long pulses in the actuator close-up.
-for k in range(3):
-    event(beat["haptic"]+k*.64,.42,lambda t:.10*math.sin(tau*147*t)*min(1,t/.03,(.42-t)/.05))
 pcm=array.array("h")
 for l,r in zip(*tracks):
     pcm.extend(round(max(-1,min(1,v))*32765) for v in (l,r))
