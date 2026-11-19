@@ -52,7 +52,7 @@ const vertexShader = `
       diameter=mix(1.6+2.7*scatter.z+3.2*glint,clamp(viewport.x*.038,10.,34.),packet);
       // The leading point stays on the route. The packet tail extends back from it.
       p-=direction*.32*diameter*packet;
-      opacity=step(0.,front)*step(front,1.)*mix(.53+.46*scatter.x,1.,packet);
+      opacity=step(0.,front)*(1.-step(1.,front))*mix(.53+.46*scatter.x,1.,packet);
     }
     gl_Position=vec4(2.*p.x/viewport.x-1.,1.-2.*p.y/viewport.y,0.,1.);
     gl_PointSize=diameter*pixelRatio;
@@ -104,7 +104,7 @@ function starRenderer(canvas, curves, joins, waves) {
   }
   for(let ch=0;ch<4;ch++){
     for(let i=0;i<132;i++){
-      const t=i/132;
+      const t=i/131;
       const offset=packetTail*(t+.030*Math.sin(8*Math.PI*t));
       point(ch,offset,0);
     }
@@ -182,10 +182,19 @@ export function createChipFlow(scene,chipMount){
   const svg=document.createElementNS(svgNS,'svg');
   svg.setAttribute('class','sl-chip-routes');
   svg.setAttribute('aria-hidden','true');
+  const tracks=channels.map(name=>{
+    const path=document.createElementNS(svgNS,'path');
+    path.setAttribute('data-channel-route',name);
+    path.setAttribute('visibility','hidden');
+    svg.append(path);
+    return path;
+  });
+  const dots=document.createElementNS(svgNS,'g');
+  svg.append(dots);
   const fallback=channels.map(()=>[2.1,1.8,1.4,1.1,.8].map(r=>{
     const dot=document.createElementNS(svgNS,'circle');
     dot.setAttribute('r',r);dot.setAttribute('visibility','hidden');
-    svg.append(dot);
+    dots.append(dot);
     return dot;
   }));
   const canvas=document.createElement('canvas');
@@ -228,6 +237,8 @@ export function createChipFlow(scene,chipMount){
       const aisle=to[i].x-p[3].x;
       p[4].set(p[3].x+aisle*.4,p[3].y);
       p[5].set(to[i].x-aisle*.38,to[i].y);
+      const xy=p.map(v=>v.x+','+v.y);
+      tracks[i].setAttribute('d','M'+xy[0]+' C'+xy.slice(1).join(' '));
       const [a,b]=segments[i].map(segment=>{
         segment.updateArcLengths();
         return segment.getLength();
@@ -240,10 +251,14 @@ export function createChipFlow(scene,chipMount){
   observer.observe(scene);observer.observe(chipMount);
   if(pins[0])observer.observe(pins[0].ownerSVGElement);
   resize();
-  canvas.addEventListener('webglcontextlost',()=>{canvas.hidden=true;svg.style.opacity='1';lastStatic=false;});
-  canvas.addEventListener('webglcontextrestored',()=>{canvas.hidden=false;svg.style.opacity='0';resize();});
-  if(!gpu)canvas.hidden=true;
-  else svg.style.opacity='0';
+  function useGpu(available){
+    canvas.hidden=!available;
+    dots.style.display=available?'none':'';
+    lastStatic=false;
+  }
+  useGpu(!!gpu);
+  canvas.addEventListener('webglcontextlost',()=>useGpu(false));
+  canvas.addEventListener('webglcontextrestored',()=>{useGpu(true);resize();});
 
   function update(next,selectedId){
     model=next;
@@ -258,6 +273,9 @@ export function createChipFlow(scene,chipMount){
     const received=[];
     for(let i=0;i<4;i++){
       waves[i]=reducedMotion?2:(elapsed-arrivals[i])*(1+packetTail)/transferTime;
+      // The leading particle starts at zero; the last trails it by packetTail.
+      const visibility=waves[i]>=0 && waves[i]<1+packetTail?'visible':'hidden';
+      if(tracks[i].getAttribute('visibility')!==visibility)tracks[i].setAttribute('visibility',visibility);
       received[i]=waves[i]>=1;
       const input=received[i]?'active':'pending';
       if(inlets[i].dataset.carrying!==input)inlets[i].dataset.carrying=input;

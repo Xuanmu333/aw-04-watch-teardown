@@ -22,9 +22,13 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   app.classList.toggle('film',film);
   const assignments = loadAssignments(film);
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
-  const pages = [['vision','Vision'],['lab','Sound Lab'],['overview','Overview']];
-  const viewButtons = pages.map(([key,label],i)=>
-    '<button type="button" data-tab="'+key+'" aria-pressed="'+(i===0)+'">'+label+'</button>').join('');
+  const pages = [
+    ['vision','Vision','m12 3 9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5'],
+    ['lab','Sound Lab','M3 10v4m4-7v10m5-14v18m5-14v10m4-7v4'],
+    ['overview','On the Wrist','m12 2 8 5v10l-8 5-8-5V7z M4 7l8 5 8-5m-8 5v10']
+  ];
+  const viewButtons = pages.map(([key,label,icon],i)=>
+    '<button type="button" data-tab="'+key+'" aria-pressed="'+(i===0)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+icon+'"/></svg>'+label+'</button>').join('');
   const partNotes = [
     'The case holds the stacked electronics. The lugs join the metal bracelet to the case.',
     'The back cover closes the case and couples the vibrator to the wrist.',
@@ -63,7 +67,7 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
       </div>
       <section id="stage" aria-label="3D watch. Drag to rotate or scroll to zoom."></section>
       <section class="overview-story" aria-labelledby="overviewTitle" inert>
-        <p class="story-kicker">SoudBridge / Overview</p>
+        <p class="story-kicker">SoudBridge / On the Wrist</p>
         <h1 id="overviewTitle">At a <em>glance.</em></h1>
         <p class="overview-intro" id="readingOrigin">Example reading</p>
         <dl class="overview-metrics">

@@ -3,6 +3,7 @@
   pointer-events:none;z-index:3;overflow:hidden;
 }
 .sl-chip-routes {fill:#e1cffa}
+.sl-chip-routes path {fill:none;stroke:#c5b7ef;stroke-opacity:.36;stroke-linecap:round}
 .sl-chip-core {
   isolation:isolate;z-index:4;aspect-ratio:1;
   --chip-pin:clamp(3px,.38vw,7px);
