@@ -7,28 +7,24 @@ import {runSim} from 'teardown-kit/runtime.js';
 import {bindWeightTitle} from './weight-title.js';
 import {buildWatch} from './watch.js';
 import {sounds,acousticState,microphones} from './acoustics.js';
-import {chapters,parts,tour,tl} from './story.js';
+import {parts} from './story.js';
 import {rhythms, loadAssignments, saveAssignments, activePulse, drivePhase} from './haptics.js';
 
 import {customSound, loadCustomSounds, saveCustomSounds, createSoundEditor} from './custom-sounds.js';
 import {createSoundLab} from './sound-lab.js';
 import {createSceneMotion} from './scene-motion.js';
+import './vision.css';
 
 const film=!!window.__CAPTURE || new URLSearchParams(location.search).has('capture');
 document.documentElement.lang='en';
-runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,title:'AW-04',subtitle:'Four-microphone sound localization watch'},director:{enabled:false}},async({canvas})=>{
+runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,title:'AW-04',subtitle:'Four-microphone sound localization watch'},director:{enabled:false}},async({canvas,cfg})=>{
   const app=document.querySelector('#app');
   app.classList.toggle('film',film);
   const assignments = loadAssignments(film);
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
-  const viewIcons = [
-    '<path d="m12 2 8 5v10l-8 5-8-5V7z M4 7l8 5 8-5m-8 5v10"/>',
-    '<path d="m12 3 9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5"/>',
-    '<path d="M3 10v4m4-7v10m5-14v18m5-14v10m4-7v4"/>'
-  ];
-  const viewButtons = ['Assembled','Exploded','Sound Lab'].map((name,i)=>
-    '<button type="button" data-scene="'+['assembled','exploded','lab'][i]+'" aria-pressed="'+(i===0)+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+viewIcons[i]+'</svg>'+name+'</button>').join('');
-  const overview = ['Watch assembly','Four microphones surround the dial. A purple sector points toward the sound. A vibrator beside the battery sends a distinct pulse pattern to the wrist.'];
+  const pages = [['vision','Vision'],['lab','Sound Lab'],['overview','Overview']];
+  const viewButtons = pages.map(([key,label],i)=>
+    '<button type="button" data-tab="'+key+'" aria-pressed="'+(i===0)+'">'+label+'</button>').join('');
   const partNotes = [
     'The case holds the stacked electronics. The lugs join the metal bracelet to the case.',
     'The back cover closes the case and couples the vibrator to the wrist.',
@@ -41,20 +37,46 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   ];
   app.insertAdjacentHTML('beforeend',`
     <header><img class="brand-emblem" src="${emblem}" alt="Motorola logo">
-    <p class="product-title" role="heading" aria-level="1">An Ambient Sound Perception Watch for the Hearing-Impaired</p>
-    ${film ? '' : '<div class="scene-actions" role="group" aria-label="Watch scene">'+viewButtons+'</div>'}
+    <p class="product-title">An Ambient Sound Perception Watch for the Hearing-Impaired</p>
+    <nav class="scene-actions" aria-label="Watch views">${viewButtons}</nav>
     <img class="brand-wordmark" src="${wordmark}" alt="motorola"></header>
     <main class="scene-surface" aria-label="Watch simulator">
-    <div id="teardown"><aside class="left">
-    <article class="hardware-detail"><h2>Hardware</h2><strong id="detailName"></strong><p id="detailText"></p>
-    <dl class="hardware-spec"><div><dt>Case diameter</dt><dd>42 mm</dd></div><div><dt>Mic spacing</dt><dd>34 mm</dd></div><div><dt>Channels</dt><dd>4</dd></div></dl></article>
-    <article class="haptic-settings"><h2>Sound & vibration</h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ Custom sound</button>'}
-    <div class="haptic-readout"><span id="rhythmNow"></span><div id="pulses" aria-hidden="true"></div></div>
-    <p id="hapticFeedback" role="status"></p></article></aside>
-    <section id="stage" aria-label="Rotatable 3D watch"><div class="stagecopy"><h1></h1><div class="english"></div></div></section>
-    <aside class="rightside"><article><div class="parts-heading"><h2>Parts</h2><button id="labelSwitch" aria-pressed="true" aria-label="Part labels">Labels</button></div>
-    <div class="partlist">${parts.map((s,i)=>'<button data-part="'+i+'"><i></i><b>'+s+'</b><span>0'+(i+1)+'</span></button>').join('')}</div></article></aside><div class="consolefoot"><div class="trackinfo"><h2>Guided tour</h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="Play guided tour"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div></div>
-    ${film ? '' : '<section id="soundLab" aria-label="Sound Lab" hidden></section>'}</main>
+    <div id="teardown">
+      <div class="vision-story">
+        <section class="vision-panel" data-story="assembled" aria-labelledby="visionTitle">
+          <p class="story-kicker">SoudBridge</p>
+          <h1 id="visionTitle" tabindex="-1">The world,<br><em>within reach.</em></h1>
+          <p class="story-body">A friend rings your doorbell. You feel a familiar rhythm on your wrist. One glance tells you where to turn.</p>
+          <button class="story-action" id="exploreWatch">Touch the dial to look inside <span aria-hidden="true">↗</span></button>
+        </section>
+        <section class="vision-panel" data-story="exploded" aria-labelledby="explodedTitle" inert>
+          <p class="story-kicker">SoudBridge / Exploded view</p>
+          <h2 id="explodedTitle" tabindex="-1">Inside the<br><em>sensation.</em></h2>
+          <p class="story-body">Four microphones catch a sound a fraction of a second apart. A chip works out what it is and where it came from. A tiny vibrator brings that moment to your wrist.</p>
+          <details class="parts-disclosure"><summary>Explore the eight parts</summary>
+            <div class="parts-list partlist">${parts.map((s,i)=>'<button type="button" data-part="'+i+'" aria-pressed="false"><b>'+s+'</b><span>'+String(i+1).padStart(2,'0')+'</span></button>').join('')}</div>
+            <p id="partNote" aria-live="polite"></p>
+            <button type="button" id="labelSwitch" aria-pressed="true">Part labels</button>
+          </details>
+          <button class="story-action" id="assembleWatch"><span aria-hidden="true">←</span> Reassemble watch</button>
+        </section>
+      </div>
+      <section id="stage" aria-label="3D watch. Drag to rotate or scroll to zoom."></section>
+      <section class="overview-story" aria-labelledby="overviewTitle" inert>
+        <p class="story-kicker">SoudBridge / Overview</p>
+        <h1 id="overviewTitle">At a <em>glance.</em></h1>
+        <p class="overview-intro" id="readingOrigin">Example reading</p>
+        <dl class="overview-metrics">
+          <div><dt>Sound detected</dt><dd id="overviewSound"></dd></div>
+          <div><dt>Source direction</dt><dd id="overviewBearing"></dd></div>
+          <div><dt>Wrist rhythm</dt><dd id="overviewRhythm"></dd></div>
+        </dl>
+        <details class="hardware-haptics haptic-settings"><summary>Sound &amp; vibration settings</summary><div id="rhythmRows"></div><button id="addSound">＋ Custom sound</button>
+          <div class="haptic-readout"><span id="rhythmNow"></span><div id="pulses" aria-hidden="true"></div></div>
+          <p id="hapticFeedback" role="status"></p></details>
+      </section>
+    </div>
+    <section id="soundLab" aria-label="Sound Lab" hidden></section></main>
     <footer><div class="footline"><img class="brand-hackathon" src="${hackathon}" alt="hackathon"></div></footer>`);
   const $=s=>app.querySelector(s),$$=s=>[...app.querySelectorAll(s)];
   bindWeightTitle($('.product-title'));
@@ -75,39 +97,44 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const samples=watch.layers.map(layer=>{
     const out=[];layer.traverse(o=>{if(!o.isMesh)return;const pos=o.geometry.attributes.position;
       for(let i=0;i<pos.count;i+=Math.max(1,Math.floor(pos.count/600)))out.push(new T.Vector3().fromBufferAttribute(pos,i));});return out;});
-  let W=1,H=1,manual=!film,current={stage:0,src:0,bearing:48,explode:0},stageId=-1,sel=-1;
-  let savedTime=0,rx=0,ry=0,zoom=1,drag=null,lastT=0,tourOffset=0;
+  let W=1,H=1,sel=-1;
+  const current={stage:0,src:0,bearing:48,explode:0};
+  let rx=0,ry=0,zoom=1,drag=null,lastT=0;
   const actions=$('.scene-actions'),labHost=$('#soundLab'),hardware=$('#teardown');
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
-  let lab=null,labDial=null,lastLabResult=null,useLabResult=false,labClock=0,lastDetail='';
-  const motion=createSceneMotion({app,stage,canvas,hardware,labHost,footer:$('.consolefoot')});
-  function user(){
-    stopPreview();
-    if(!manual){
-      savedTime=(lastT-tourOffset+tl.duration)%tl.duration;
-      motion.setExplosion(current.stage===1?current.explode:0);
-      sel=({2:4,3:3,5:7})[current.stage]??-1;
-    }
-    manual=true;
-  }
-  function selectScene(name){
-    user(); sel=-1; drag=null; rx=ry=0; zoom=1;
-    if(name==='lab'){
+  let lab=null,labDial=null,lastLabResult=null,useLabResult=false,labClock=0;
+  const motion=createSceneMotion({app,stage,canvas,hardware,labHost});
+  function selectPage(page,exploded=false){
+    stopPreview(); sel=-1; drag=null; rx=ry=0; zoom=1;
+    if(page==='lab'){
       if(!lab)lab=createSoundLab(labHost,{onDialState:state=>{
         labDial=state;
         if(!state.listening)lastLabResult=state;
-      }});
+      },onTestVibration:startVibration});
       motion.setReceiver(lab.receiver);
       useLabResult=true;
     }
-    current.stage=name==='exploded'?1:0;
-    motion.select(name);
-    stageId=-1;
+    const view=exploded?'exploded':'assembled';
+    app.dataset.page=page;
+    if(page!=='lab'){app.dataset.view=view;app.dataset.hardwarePage=page;}
+    for(const button of actions.children)button.setAttribute('aria-pressed',String(button.dataset.tab===page));
+    $$('.vision-panel').forEach(panel=>panel.inert=page!=='vision'||panel.dataset.story!==view);
+    $('.overview-story').inert=page!=='overview';
+    if(!exploded)$('.parts-disclosure').open=false;
+    current.stage=exploded?1:0;
+    motion.select(page==='lab'?'lab':view);
+    showPart(-1);
   }
-  actions?.addEventListener('click',e=>{
-    const button=e.target.closest('button[data-scene]');
-    if(button) selectScene(button.dataset.scene);
+  actions.addEventListener('click',e=>{
+    const button=e.target.closest('button[data-tab]');
+    if(button) selectPage(button.dataset.tab);
   });
+  function setExploded(open,moveFocus){
+    selectPage('vision',open);
+    if(moveFocus)$(open?'#explodedTitle':'#visionTitle').focus({preventScroll:true});
+  }
+  $('#exploreWatch').onclick=()=>setExploded(true,true);
+  $('#assembleWatch').onclick=()=>setExploded(false,true);
   let lastDetection = '', pulseStart = -Infinity;
   let previewTiming = [];
   const feedback = $('#hapticFeedback');
@@ -121,12 +148,20 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     pulseStart = -Infinity;
   }
   function selectSound(index) {
-    user();
+    stopPreview();
     useLabResult=false;
     current.src = index;
     current.bearing = catalog[index].angle;
   }
   const rhythmFor = sound => sound.custom ? sound.rhythm : assignments[sound.en];
+  function startVibration(sound) {
+    stopPreview();
+    const rhythm = rhythms[rhythmFor(sound)];
+    previewTiming = rhythm.timing;
+    pulseStart = performance.now();
+    if (previewTiming.length && !document.hidden && deviceSupportsVibration) navigator.vibrate(previewTiming);
+    return sound.name + ' · ' + rhythm.label + (previewTiming.length && !deviceSupportsVibration ? ' (on-screen preview).' : '.');
+  }
   function drawSoundControls() {
     const rows = $('#rhythmRows');
     rows.replaceChildren();
@@ -141,7 +176,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       if (sound.custom) {
         title.className = 'edit-sound';
         title.setAttribute('aria-label','Edit sound: ' + label);
-        title.onclick = () => { user(); openEditor(sound); };
+        title.onclick = () => { stopPreview(); openEditor(sound); };
       }
       const select = document.createElement('select');
       select.id = selectId;
@@ -150,7 +185,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       for (const [id,preset] of Object.entries(rhythms)) select.add(new Option(preset.label,id));
       select.value = rhythmFor(sound);
       select.onchange = () => {
-        user();
+        stopPreview();
         if (sound.custom) sound.rhythm = select.value;
         else assignments[sound.en] = select.value;
         const saved = sound.custom ? saveCustomSounds(catalog) : saveAssignments(assignments);
@@ -161,28 +196,16 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       preview.dataset.try = sound.en;
       preview.setAttribute('aria-label','Test vibration: ' + label);
       preview.onclick = () => {
-        selectScene('assembled');
-        motion.setExplosion(0);
         selectSound(index);
         const rect = stage.getBoundingClientRect();
-        if (rect.top < 0 || rect.bottom > window.innerHeight) {
-          stage.scrollIntoView({block:'center',behavior:'instant'});
-        }
-        const rhythm = rhythms[rhythmFor(sound)];
-        feedback.textContent = sound.name + ' · ' + rhythm.label +
-          (deviceSupportsVibration ? '.' : ' (on-screen preview)');
-        previewTiming = rhythm.timing;
-        pulseStart = performance.now();
-        if (!document.hidden && deviceSupportsVibration) {
-          const accepted = navigator.vibrate(previewTiming.length ? previewTiming : 0);
-          if (!accepted) feedback.textContent = 'Vibration is previewed on screen on this device.';
-        }
+        if (rect.top < 0 || rect.bottom > window.innerHeight) stage.scrollIntoView({block:'center',behavior:'instant'});
+        feedback.textContent = startVibration(sound);
       };
       row.append(title,select,preview);
       rows.append(row);
     }
   }
-  const openEditor = film ? null : createSoundEditor(catalog, (existing,name,rhythm) => {
+  const openEditor = createSoundEditor(catalog, (existing,name,rhythm) => {
     const sound = existing ?? customSound('custom-' + crypto.getRandomValues(new Uint32Array(4)).join('-'),name,rhythm);
     sound.name = name;
     sound.rhythm = rhythm;
@@ -200,49 +223,70 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     drawSoundControls();
     feedback.textContent = sound.name + (saved ? '. Deleted.' : '. Removed for this session only.');
   });
-  if (!film) $('#addSound').onclick = () => { user(); openEditor(null); };
+  $('#addSound').onclick = () => { stopPreview(); openEditor(null); };
   drawSoundControls();
   $('.haptic-settings').addEventListener('keydown', event => event.stopPropagation());
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopPreview();
   });
   let labels=true;
-  $('#labelSwitch').onclick=()=>{user();labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
-  $$('.partlist button').forEach((button,i)=>button.onclick=()=>{
-    const selected=sel===i;
-    selectScene('exploded');
-    if(!selected){
-      sel=i;
-      current.stage=i===7?5:i===4?2:i===3?3:1;
-      motion.setExplosion(0);
-    }
-    stageId=-1;
-  });
-  function restart(){
-    if(motion.target==='lab')return;
-    stopPreview(); manual=false; useLabResult=false; tourOffset=lastT-savedTime;
-    stageId=-1;sel=-1;rx=ry=0;zoom=1;
+  $('#labelSwitch').onclick=()=>{labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
+  function showPart(index){
+    sel=index;
+    $('#partNote').textContent=index>=0?partNotes[index]:'';
+    $$('.partlist button').forEach((button,i)=>button.setAttribute('aria-pressed',String(i===index)));
   }
-  $('.play').onclick=()=>manual?restart():user();
+  $$('.partlist button').forEach((button,i)=>button.onclick=()=>{
+    rx=ry=0;zoom=1;
+    showPart(sel===i?-1:i);
+    current.stage=sel===7?5:sel===4?2:sel===3?3:1;
+  });
+  $('.parts-disclosure').addEventListener('toggle',e=>{
+    if(!e.target.open&&sel>=0){showPart(-1);rx=ry=0;zoom=1;current.stage=1;}
+  });
+  selectPage('vision');
+  const picker=new T.Raycaster(),pointer=new T.Vector2();
+  const face=watch.display.children.find(mesh=>mesh.material.map===watch.dial.texture);
+  function onFace(e,visibleOnly=false){
+    if(app.dataset.page!=='vision'||motion.target!=='assembled'||motion.explosion>0||motion.dock>0)return false;
+    const r=canvas.getBoundingClientRect();
+    pointer.set(2*(e.clientX-r.left)/r.width-1,1-2*(e.clientY-r.top)/r.height);
+    picker.setFromCamera(pointer,camera);
+    if(!picker.intersectObject(face,false).length)return false;
+    return !visibleOnly||picker.intersectObject(watch.root,true).find(hit=>hit.object.visible&&hit.object.parent.visible)?.object===face;
+  }
   canvas.onpointerdown=e=>{
-    if(motion.dock>0)return;
-    user();drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);
+    if(motion.dock>0||e.button!==0||drag)return;
+    stopPreview();drag={id:e.pointerId,x:e.clientX,y:e.clientY,turned:false};canvas.setPointerCapture(e.pointerId);
   };
-  canvas.onpointermove=e=>{if(!drag)return;user();ry+=(e.clientX-drag[0])*.009;rx+=(e.clientY-drag[1])*.009;drag=[e.clientX,e.clientY];};
-  canvas.onpointerup=canvas.onpointercancel=()=>drag=null;
-  canvas.addEventListener('wheel',e=>{if(motion.dock>0)return;e.preventDefault();user();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
+  canvas.onpointermove=e=>{
+    if(!drag){canvas.style.cursor=onFace(e)?'pointer':'';return;}
+    if(drag.id!==e.pointerId)return;
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+    if(!drag.turned&&Math.hypot(dx,dy)<5)return;
+    drag.turned=true;ry+=dx*.009;rx+=dy*.009;drag.x=e.clientX;drag.y=e.clientY;
+    canvas.style.cursor='grabbing';
+  };
+  canvas.onpointerup=e=>{
+    if(drag?.id!==e.pointerId)return;
+    const tap=!drag.turned&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5;
+    drag=null;canvas.style.cursor='';
+    if(tap&&onFace(e,true))setExploded(true,false);
+  };
+  canvas.onlostpointercapture=canvas.onpointercancel=()=>{drag=null;canvas.style.cursor='';};
+  canvas.addEventListener('wheel',e=>{if(motion.dock>0)return;e.preventDefault();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
   window.addEventListener('keydown',e=>{
-    if(film||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('dialog'))return;
-    if(motion.target==='lab'||e.target.closest('button,input,select')){
-      if(e.key===' '||e.key.startsWith('Arrow'))e.stopImmediatePropagation();
+    if(e.ctrlKey||e.metaKey||e.altKey)return;
+    // Keep the Teardown runtime's playback shortcuts out of native controls.
+    if(e.target.closest('dialog,button,input,select,summary,textarea')||app.dataset.page==='lab'){
+      if([' ','h','f','r'].includes(e.key)||e.key.startsWith('Arrow')||/^[1-9]$/.test(e.key))e.stopImmediatePropagation();
       return;
     }
-    if(e.key==='1'||e.key==='2'||e.key==='3') selectScene(['assembled','exploded','lab'][Number(e.key)-1]);
-    else if(e.key===' '){manual?restart():user();}
+    if(/^[1-3]$/.test(e.key)) selectPage(pages[Number(e.key)-1][0]);
     else if(e.key.startsWith('Arrow')){
-      user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;
+      if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;
       if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;
-    }else return;
+    }else if(e.key!==' ')return;
     e.preventDefault();e.stopImmediatePropagation();
   });
   function resize(){
@@ -274,9 +318,11 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     watch.layers.forEach((g,i)=>{if(g.visible)for(const p of samples[i])bounds.expandByPoint(v.copy(p).applyMatrix4(g.matrixWorld));});
     const centre=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
     const coverage=focus>=0?.69:T.MathUtils.lerp(.84,.76,ex);
-    const height=T.MathUtils.lerp(Math.max(size.y/coverage,size.x/(W/H*coverage),1)/zoom,52*H/W,dock);
+    // Reserve the label column in the camera frame as the stack opens.
+    const gutter=labels&&W>310?Math.min(W*.31,155)*ex:0;
+    const height=T.MathUtils.lerp(Math.max(size.y/coverage,size.x/((W-gutter)/H*coverage),1)/zoom,52*H/W,dock);
     camera.left=-height*W/H/2;camera.right=-camera.left;camera.top=height/2;camera.bottom=-height/2;
-    camera.position.set(centre.x*(1-dock),centre.y*(1-dock),180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    camera.position.set((centre.x+gutter*height/(2*H))*(1-dock),centre.y*(1-dock),180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
     // Frame the resting assembly first so the camera does not track its vibration.
     if(id===0 || id===4) watch.root.translateY(-1.15*drive);
     leaders.hidden=!(id===1 && ex>.76 && sel<0 && labels && W>310);
@@ -288,7 +334,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       const anchors=points.map((p,i)=>{v.fromArray(p).applyMatrix4(watch.layers[i].matrixWorld).project(camera);return {x:(v.x+1)*W/2,y:(1-v.y)*H/2,i};}).sort((a,b)=>a.y-b.y);
       legend.font=W<480?'500 11px "PingFang SC", sans-serif':'500 13px "PingFang SC", sans-serif';
       const labelWidth=Math.max(...parts.map(name=>legend.measureText(name).width));
-      const end=Math.min(W*.865,W-labelWidth-14);let prev=-50;
+      const end=W-labelWidth-16;let prev=-50;
       legend.strokeStyle='#777288';
       legend.lineWidth=.9;
       for(const {x,y,i} of anchors){const yy=Math.max(y,prev+23);prev=yy;
@@ -300,19 +346,13 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       const [x,y]=microphones[i];v.set(x*1.25,y*1.25,3.0).applyMatrix4(watch.array.matrixWorld).project(camera);
       tag.style.left=((v.x+1)*W/2)+'px';tag.style.top=((1-v.y)*H/2)+'px';});
   }
-  let docked=false,paintedDial=null,paintedWidth=0,paintedHeight=0;
-  function render(raw){
-    const dt=(raw-lastT+tl.duration)%tl.duration;
-    lastT=raw;
-    const t=(raw-tourOffset+tl.duration)%tl.duration;
-    if(!manual){
-      const a=tour(t);current={...a,bearing:sounds[a.src].angle};
-      motion.tour(a.stage===0||a.stage===4?'assembled':'exploded',a.explode);
-    }else{
-      motion.advance(dt,reducedMotion.matches,sel>=0);
-      current.explode=motion.explosion;
-      if(sel<0)current.stage=motion.explosion>0||motion.target==='exploded'?1:0;
-    }
+  let docked=false,paintedDial=null,paintedWidth=0,paintedHeight=0,paintedDrive=0;
+  function render(t){
+    const dt=(t-lastT+cfg.duration)%cfg.duration;
+    lastT=t;
+    motion.advance(dt,reducedMotion.matches,sel>=0);
+    current.explode=motion.explosion;
+    if(sel<0)current.stage=motion.explosion>0||motion.target==='exploded'?1:0;
     if(lab){
       motion.layout();
       const atReceiver=motion.dock===1;
@@ -322,41 +362,32 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     }
     resize();
     const c=current,id=c.stage;
+    const elapsedMs = performance.now() - pulseStart;
+    const pulse = activePulse(previewTiming, elapsedMs);
+    const drive = drivePhase(previewTiming,pulse,elapsedMs);
     if(docked&&labDial){
-      // The docked watch is fixed; only the acoustic field and chip need to animate.
-      if(labDial!==paintedDial||W!==paintedWidth||H!==paintedHeight){
-        watch.dial.update(labDial);watch.actuator.update(false,0);
-        pose({stage:0,explode:0},0,0);
+      if(labDial!==paintedDial||W!==paintedWidth||H!==paintedHeight||drive!==paintedDrive){
+        watch.dial.update(labDial);watch.actuator.update(false,drive);
+        pose({stage:0,explode:0},0,drive);
         renderer.render(scene,camera);
-        paintedDial=labDial;paintedWidth=W;paintedHeight=H;
+        paintedDial=labDial;paintedWidth=W;paintedHeight=H;paintedDrive=drive;
       }
       return;
     }
-    const s=useLabResult&&lastLabResult?lastLabResult:acousticState(c.src,c.bearing,t,catalog);
-    const focus=sel>=0?sel:id===2?4:id===3?3:id===5?7:-1;
-    const detail=focus>=0?parts[focus]:overview[0];
-    if(lastDetail!==detail){
-      $('#detailName').textContent=detail;
-      $('#detailText').textContent=focus>=0?partNotes[focus]:overview[1];
-      $$('.partlist button').forEach((button,i)=>button.setAttribute('aria-pressed',i===focus));
-      lastDetail=detail;
-    }
-    if(stageId!==id){
-      stageId=id;
-      const [name,en,,description]=chapters[id];
-      $('.stagecopy h1').textContent=sel>=0?parts[sel]:name;
-      $('.english').textContent=sel>=0?'COMPONENT '+String(sel+1).padStart(2,'0'):en;
-      $('#description').textContent=sel>=0?partNotes[sel]:description;
-    }
-    $('.play').textContent=manual?'▶':'Ⅱ';$('.play').setAttribute('aria-label',manual?'Play guided tour':'Pause guided tour');
-    const playhead=manual?savedTime:t;
-    $('#trackTime').textContent=String(Math.floor(playhead)).padStart(2,'0')+' / '+tl.duration+' s';$('.progress i').style.width=(playhead/tl.duration*100)+'%';
+    const lastReading=useLabResult&&lastLabResult;
+    const s=lastReading||acousticState(c.src,c.bearing,t,catalog);
+    const direction=s.hasBearing===false?'Undetermined':s.degree+'°';
+    const origin=lastReading?'Latest Sound Lab reading':'Example reading';
+    if($('#overviewBearing').textContent!==direction)$('#overviewBearing').textContent=direction;
+    if($('#readingOrigin').textContent!==origin)$('#readingOrigin').textContent=origin;
     const sound = s.detected.en;
     const rhythmId = rhythmFor(s.detected);
     const rhythm = rhythms[rhythmId];
     const detection = sound + '/' + rhythmId;
     if (lastDetection !== detection) {
       lastDetection = detection;
+      $('#overviewSound').textContent = s.detected.name;
+      $('#overviewRhythm').textContent = rhythm.label;
       $('#rhythmNow').textContent = s.detected.name + ' · ' + rhythm.label;
       pulseBars.replaceChildren(...rhythm.timing.map((ms,i) => {
         const segment = document.createElement('i');
@@ -365,13 +396,10 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
         return segment;
       }));
     }
-    const elapsedMs = performance.now() - pulseStart;
-    const pulse = activePulse(previewTiming, elapsedMs);
     for (let i = 0; i < pulseBars.children.length; i++) pulseBars.children[i].classList.toggle('playing', i === pulse);
-    const drive = drivePhase(previewTiming,pulse,elapsedMs);
     watch.actuator.update(id===5,drive);
     watch.dial.update(s);
-    pose(c,manual && id===0 ? savedTime : t,drive);
+    pose(c,reducedMotion.matches||id===0?0:t,drive);
     renderer.render(scene,camera);
   }
   return {render,resize,warm:()=>renderer.compileAsync(scene,camera)};

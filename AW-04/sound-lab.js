@@ -36,7 +36,7 @@ function fieldGrid() {
     '<g class="sl-grid-distance"><text x="179" y="179">'+axisLimit/2+' m</text><text x="112" y="111">'+axisLimit+' m</text></g></svg>';
 }
 
-export function createSoundLab(host, {onDialState} = {}) {
+export function createSoundLab(host, {onDialState,onTestVibration} = {}) {
   const sources = initialSources.map(source=>({...source}));
   let mode='single', selected=sources[0], model;
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -47,13 +47,13 @@ export function createSoundLab(host, {onDialState} = {}) {
         <div class="sl-map-wrap"><div class="sl-map" data-lab-map>
           ${fieldGrid()}
           <div class="sl-plane" data-lab-travel>
-            <div class="sl-watch" role="img" aria-label="Watch receiver"></div>
+            <div class="sl-watch" role="group" aria-label="Watch receiver"><button type="button" class="sl-dial-test"></button></div>
             ${sources.map(s=>`<button type="button" class="sl-node" data-lab-node="${s.id}" aria-label="Move ${sounds[s.type].name}" aria-describedby="slMoveHelp">${icon(s.type)}<span class="sl-node-label">${sounds[s.type].name}</span></button>`).join('')}
           </div>
         </div></div>
         <div class="sl-chip-core"></div>
       </div>
-      <div class="sl-field-foot"><span id="slMoveHelp">Drag a source or use the arrow keys.</span><span>Watch enlarged · timing slowed</span></div>
+      <div class="sl-field-foot"><span id="slMoveHelp">Drag a source or use the arrow keys. Tap the watch face to test its vibration.</span><span role="status">Watch enlarged · timing slowed</span></div>
       <section class="sl-controls" aria-label="Sound source controls">
         <div class="sl-source-controls">
           <div class="sl-control-head"><h3>Sound sources</h3>
@@ -82,6 +82,8 @@ export function createSoundLab(host, {onDialState} = {}) {
   const chipFlow=createChipFlow(one('.sl-universe'),one('.sl-chip-core'));
   const pipeline=createSignalPipeline(one('.sl-pipeline-host'));
   const receiver=one('.sl-watch');
+  const dialTest=one('.sl-dial-test'), hapticStatus=one('.sl-field-foot [role=status]');
+  const defaultStatus=hapticStatus.textContent;
   let lastFrame=0,cycleStart=0,shownDialState,displayedSourcePhase;
   const listening={listening:true,detected:{name:'Listening',en:'LISTENING'},angle:0,degree:'—',hasBearing:false};
   const nodes = new Map(sources.map(source => [source.id,{
@@ -90,10 +92,11 @@ export function createSoundLab(host, {onDialState} = {}) {
   }]));
   const modeButtons=all('[data-lab-mode]'), typeButtons=all('[data-lab-type]'), axes=all('[data-lab-axis]');
   const visibleSources = ()=>mode==='multi' ? sources : [selected];
-  let activeDrag=null;
+  let activeDrag=null,rangePointer=null;
 
-  function refresh(restart=true) {
+  function refresh() {
     model=analyzeScene(visibleSources());
+    if(hapticStatus.textContent!==defaultStatus)hapticStatus.textContent=defaultStatus;
     displayedSourcePhase='';
     host.dataset.primary=model.primaryId;
     host.dataset.sourceMode=mode;
@@ -129,8 +132,7 @@ export function createSoundLab(host, {onDialState} = {}) {
     paths.update(active,model,selected.id);
     chipFlow.update(model,selected.id);
     pipeline.update(model,selected.id);
-    if(restart)replay();
-    else render(lastFrame);
+    replay();
   }
 
   modeButtons.forEach(button=>button.addEventListener('click',()=>{
@@ -142,13 +144,23 @@ export function createSoundLab(host, {onDialState} = {}) {
     refresh();
   }));
   axes.forEach(input=>{
-    input.addEventListener('pointerdown',replay);
+    input.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;
+      rangePointer=event.pointerId;
+      replay();
+    });
     input.addEventListener('input',()=>{
       selected[input.dataset.labAxis]=Number(input.value);
-      refresh(false);
+      refresh();
     });
-    input.addEventListener('change',replay);
   });
+  function releaseRange(event) {
+    if(event.pointerId!==rangePointer)return;
+    rangePointer=null;
+    replay();
+  }
+  window.addEventListener('pointerup',releaseRange);
+  window.addEventListener('pointercancel',releaseRange);
   for (const source of sources) {
     const {node,row}=nodes.get(source.id);
     row.addEventListener('click',()=>{selected=source; refresh();});
@@ -167,7 +179,7 @@ export function createSoundLab(host, {onDialState} = {}) {
       const rect=plane.getBoundingClientRect();
       source.x=limit(activeDrag.sx+2*axisLimit*(event.clientX-activeDrag.x)/rect.width);
       source.y=limit(activeDrag.sy-2*axisLimit*(event.clientY-activeDrag.y)/rect.height);
-      refresh(false);
+      refresh();
     });
     node.addEventListener('lostpointercapture',event=>{
       if (activeDrag?.id!==event.pointerId) return;
@@ -183,18 +195,20 @@ export function createSoundLab(host, {onDialState} = {}) {
       selected=source;
       source.x=limit(source.x+delta[0]*step);
       source.y=limit(source.y+delta[1]*step);
-      refresh(!event.repeat);
+      refresh();
     });
   }
 
   function render(timeSeconds) {
     lastFrame=timeSeconds;
-    const elapsed=Math.max(0,timeSeconds-cycleStart);
-    waves.render(elapsed,reducedMotion.matches);
-    paths.render(elapsed,reducedMotion.matches);
-    chipFlow.render(elapsed,reducedMotion.matches);
-    pipeline.render(elapsed,reducedMotion.matches);
-    const complete=reducedMotion.matches || elapsed>=OUTPUT_START;
+    const positioning=activeDrag!==null||rangePointer!==null;
+    const elapsed=positioning?0:Math.max(0,timeSeconds-cycleStart);
+    const staticResult=reducedMotion.matches&&!positioning;
+    waves.render(elapsed,staticResult);
+    paths.render(elapsed,staticResult);
+    chipFlow.render(elapsed,staticResult);
+    pipeline.render(elapsed,staticResult);
+    const complete=staticResult || elapsed>=OUTPUT_START;
     const sourcePhase=complete?'output':elapsed>=AI_START?'filtered':'receiving';
     if (sourcePhase!==displayedSourcePhase) {
       for (const item of model.sources) {
@@ -204,6 +218,8 @@ export function createSoundLab(host, {onDialState} = {}) {
         row.querySelector('.sl-source-role').textContent=complete?(primary?'Primary':'Background'):(item.id===selected.id?'Selected':'');
         row.querySelector('[data-clean]').textContent=sourcePhase==='receiving'?'—':item.cleanDb.toFixed(1)+' dB';
       }
+      dialTest.title='Test '+(complete?model.detected:sounds[selected.type]).name+' vibration';
+      dialTest.setAttribute('aria-label',dialTest.title);
       displayedSourcePhase=sourcePhase;
     }
     const dial=complete ? model.dialState : listening;
@@ -217,6 +233,11 @@ export function createSoundLab(host, {onDialState} = {}) {
     cycleStart=lastFrame;
     render(lastFrame);
   }
+  dialTest.addEventListener('click',()=>{
+    const sound=shownDialState?.listening?sounds[selected.type]:model.detected;
+    const feedback=onTestVibration?.(sound);
+    if(feedback)hapticStatus.textContent=feedback;
+  });
   one('[data-replay-signal]').addEventListener('click',replay);
   refresh();
   return {render,replay,receiver,resize:chipFlow.resize};

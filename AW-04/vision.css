@@ -1,0 +1,261 @@
+/* One sliding selection stays anchored to the three scene buttons. */
+.scene-actions {
+  --selection: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  position: relative;
+  isolation: isolate;
+  padding: 4px;
+  border: 1px solid #ddd9e5;
+  border-radius: 11px;
+  background: #fff;
+}
+.scene-actions:has(button:nth-child(2)[aria-pressed=true]) { --selection: 1; }
+.scene-actions:has(button:nth-child(3)[aria-pressed=true]) { --selection: 2; }
+.scene-actions::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 4px auto 4px 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: 7px;
+  background: #eee9f7;
+  transform: translateX(calc(var(--selection) * 100%));
+  transition: transform 360ms cubic-bezier(.22, 1, .36, 1);
+}
+.scene-actions button,
+.scene-actions button[aria-pressed=true] {
+  padding: 8px 13px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: #57525f;
+  white-space: nowrap;
+  font: 570 12px/1.2 var(--sans);
+}
+.scene-actions button[aria-pressed=true] { color: #553777; }
+.scene-actions button:hover { color: #342441; }
+.scene-actions button:focus-visible { outline-offset: -2px; }
+
+#app[data-page] > header {
+  border-bottom: 1px solid #e6e2eb;
+  background: #fff;
+}
+#app[data-page] .brand-hackathon { width: clamp(90px, 8.5vw, 132px); }
+#app[data-page] #teardown {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 43fr) minmax(0, 57fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0 clamp(14px, 3vw, 64px) 0 clamp(32px, 7vw, 144px);
+  background: linear-gradient(90deg, #fff 3%, #ffffffeb 30%, #ffffff00 65%);
+}
+#app[data-page] #stage {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: stretch;
+  margin: 0;
+}
+.vision-story, .overview-story {
+  --story-padding-y: clamp(20px, 4vh, 54px);
+  grid-area: 1 / 1;
+  align-self: center;
+  position: relative;
+  min-width: 0;
+  max-height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d4c9e1 transparent;
+  padding: var(--story-padding-y) 10px var(--story-padding-y) 0;
+}
+.overview-story { display: none; }
+#app[data-hardware-page=overview] .vision-story { display: none; }
+#app[data-hardware-page=overview] .overview-story { display: block; }
+.vision-panel {
+  transition: opacity 280ms ease, transform 420ms cubic-bezier(.21,.73,.21,1), visibility 0s;
+}
+#app[data-view=assembled] [data-story=exploded],
+#app[data-view=exploded] [data-story=assembled] {
+  position: absolute;
+  inset-inline: 0 10px;
+  top: var(--story-padding-y);
+  transform: translateY(9px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s 150ms;
+}
+.story-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 clamp(14px, 2.5vh, 28px);
+  color: #635276;
+  font: 600 10px/1.5 var(--mono);
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.story-kicker::before {
+  content: "";
+  width: 21px;
+  height: 2px;
+  background: #8764b4;
+}
+.vision-panel :is(h1,h2),
+.overview-story :is(h1,h2) {
+  display: block;
+  margin: 0;
+  font: 480 clamp(58px, 6vw, 118px)/.99 var(--sans);
+  letter-spacing: -.071em;
+  color: #242137;
+}
+.vision-panel :is(h1,h2)::before,
+.overview-story :is(h1,h2)::before { content: none; }
+.vision-panel :is(h1,h2) em,
+.overview-story :is(h1,h2) em {
+  font: italic 400 1.07em/.98 Georgia, 'Times New Roman', serif;
+  letter-spacing: -.067em;
+  color: #6b478b;
+}
+.story-body, .overview-intro {
+  max-width: 37ch;
+  margin: clamp(20px, 3.4vh, 38px) 0 0;
+  font: 420 clamp(15px, 1.17vw, 22px)/1.58 var(--sans);
+  color: #554f60;
+  text-wrap: pretty;
+}
+.story-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: clamp(19px, 3.4vh, 38px);
+  padding: 10px 19px;
+  border: 1px solid #322a3d;
+  border-radius: 24px;
+  font: 560 13px/1.25 var(--sans);
+  background: #31283b;
+  color: #fff;
+}
+.story-action:hover { color: #fff; background: #544064; border-color: #544064; }
+.story-action svg { width: 16px; height: 16px; }
+.overview-story :is(h1,h2), .vision-panel[data-story=exploded] :is(h1,h2) {
+  font-size: clamp(49px, 5vw, 94px);
+}
+.overview-metrics {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .85fr) minmax(0, 1.35fr);
+  gap: clamp(12px, 2.4vw, 46px);
+  padding-block: 17px;
+  margin: clamp(20px, 3.7vh, 36px) 0 0;
+  border-block: 1px solid #dcd5e4;
+}
+.overview-metrics > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 7px;
+}
+.overview-metrics dt { color: #595360; font: 530 11px/1.4 var(--sans); }
+.overview-metrics dd {
+  order: -1;
+  margin: 0;
+  color: #3d2e4b;
+  font: 540 clamp(20px, 2vw, 36px)/1 var(--sans);
+  letter-spacing: -.06em;
+  overflow-wrap: anywhere;
+}
+details.parts-disclosure, details.hardware-haptics {
+  max-width: 450px;
+  margin-top: 16px;
+  color: #40364b;
+}
+.parts-disclosure > summary, .hardware-haptics > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  font: 580 13px/1.4 var(--sans);
+}
+:is(.parts-disclosure, .hardware-haptics) > summary::-webkit-details-marker { display: none; }
+:is(.parts-disclosure, .hardware-haptics) > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+:is(.parts-disclosure, .hardware-haptics)[open] > summary::after {
+  margin-top: 4px;
+  transform: rotate(-135deg);
+}
+:is(.parts-disclosure, .hardware-haptics) > summary:focus-visible {
+  outline: 2px solid var(--vio);
+  outline-offset: 2px;
+}
+.parts-disclosure .partlist {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(4, auto);
+  grid-auto-flow: column;
+  gap: 0 12px;
+}
+.parts-disclosure #partNote {
+  color: #554f60;
+  font: 13px/1.5 var(--sans);
+}
+details.hardware-haptics { padding-top: 0; border: 0; }
+
+@media (min-width: 761px) and (max-width: 1024px) {
+  #app[data-page] #teardown { padding-inline: 4vw 1.5vw; }
+  .scene-actions button { padding-inline: 9px; }
+}
+@media (max-width: 760px) {
+  .scene-actions button { min-height: 40px; padding-inline: 13px; }
+  #app[data-page] #teardown {
+    grid-template: auto auto / minmax(0, 1fr);
+    align-content: start;
+    padding: 0 0 12px;
+    background: linear-gradient(180deg, #fff, #ffffffe8 24%, #ffffff00 60%);
+  }
+  .vision-story, .overview-story {
+    --story-padding-y: clamp(24px, 4.5dvh, 44px);
+    grid-area: 1 / 1;
+    max-height: none;
+    overflow: visible;
+    padding: var(--story-padding-y) clamp(20px, 6vw, 44px) 0;
+  }
+  #app[data-view=assembled] [data-story=exploded],
+  #app[data-view=exploded] [data-story=assembled] {
+    inset-inline: clamp(20px, 6vw, 44px);
+  }
+  .vision-panel :is(h1,h2), .overview-story :is(h1,h2) {
+    font-size: clamp(47px, 10.5vw, 68px);
+  }
+  .story-kicker { margin-bottom: 11px; font-size: 9px; }
+  .story-body, .overview-intro { margin-top: 15px; max-width: 44ch; font-size: 15px; line-height: 1.45; }
+  .story-action { min-height: 42px; margin-top: 17px; padding-block: 8px; }
+  .overview-metrics { gap: 12px; margin-top: 17px; padding-block: 12px; }
+  details.parts-disclosure, details.hardware-haptics { margin-top: 4px; }
+  #app[data-page] #stage {
+    grid-area: 2 / 1;
+    height: clamp(294px, 48dvh, 510px);
+    min-height: 0;
+  }
+}
+@media (max-width: 760px) and (max-height: 700px) {
+  #app[data-page] #teardown { background: linear-gradient(0deg, #fff, #ffffff00 85%); }
+  #app[data-page] #stage { grid-row: 1; height: clamp(230px, 42dvh, 294px); }
+  .vision-story, .overview-story { grid-row: 2; --story-padding-y: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-actions::before, #app[data-view] .vision-panel[data-story] { transition: none; }
+}

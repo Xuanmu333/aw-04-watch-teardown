@@ -3,8 +3,7 @@
 const ease = t => t*t*(3-2*t);
 const mix = (a,b,t) => a+(b-a)*t;
 
-export function createSceneMotion({app,stage,canvas,hardware,labHost,footer}) {
-  const buttons = [...app.querySelectorAll('button[data-scene]')];
+export function createSceneMotion({app,stage,canvas,hardware,labHost}) {
   let target='assembled', opening=0, travel=0, receiver=null, inFlight=false;
   const flight=document.createElement('div');
   flight.className='watch-flight';
@@ -14,7 +13,6 @@ export function createSceneMotion({app,stage,canvas,hardware,labHost,footer}) {
   function select(name) {
     target=name;
     app.dataset.scene=name;
-    for (const button of buttons) button.setAttribute('aria-pressed',String(button.dataset.scene===name));
     hardware.inert=name==='lab';
     if(labHost)labHost.inert=name!=='lab'||travel<1;
   }
@@ -41,7 +39,7 @@ export function createSceneMotion({app,stage,canvas,hardware,labHost,footer}) {
       if(canvas.parentNode!==stage)stage.prepend(canvas);
       inFlight=false;flight.hidden=true;
       hardware.hidden=false;hardware.style.opacity='';
-      labHost.hidden=true;footer.style.visibility='';
+      labHost.hidden=true;
       return;
     }
     labHost.hidden=false;
@@ -49,7 +47,6 @@ export function createSceneMotion({app,stage,canvas,hardware,labHost,footer}) {
       if(canvas.parentNode!==receiver)receiver.prepend(canvas);
       inFlight=false;flight.hidden=true;hardware.hidden=true;
       labHost.style.opacity='1';labHost.inert=target!=='lab';
-      footer.style.visibility='hidden';
       return;
     }
     hardware.hidden=false;
@@ -61,17 +58,11 @@ export function createSceneMotion({app,stage,canvas,hardware,labHost,footer}) {
     }
     hardware.style.opacity=String(1-ease(Math.min(1,travel*1.6)));
     labHost.style.opacity=String(ease(Math.min(1,travel*1.4)));
-    footer.style.visibility=travel>.4?'hidden':'';
   }
 
   return {
     select,advance,layout,
     setReceiver(node){receiver=node;},
-    setExplosion(value){opening=value;},
-    tour(name,ex){
-      if(target!==name)select(name);
-      opening=ex;travel=0;app.dataset.motion='idle';
-    },
     get target(){return target;},
     get explosion(){return ease(opening);},
     get dock(){return ease(travel);}

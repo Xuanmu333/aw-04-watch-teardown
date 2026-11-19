@@ -1,9 +1,7 @@
 import {sounds} from './acoustics.js';
-import {AI_START, OUTPUT_START, receiveTime} from './signal-timing.js';
+import {AI_START, OUTPUT_START, computeStep, receiveTime} from './signal-timing.js';
 import './signal-pipeline.css';
 
-const fitStart = AI_START + (OUTPUT_START - AI_START) * .26;
-const locateStart = AI_START + (OUTPUT_START - AI_START) * .68;
 const compass = ['N','NE','E','SE','S','SW','W','NW'];
 const signed = value => (Math.round(value)>0 ? '+' : '') + Math.round(value) + ' µs';
 const stages = {emit:'Wave in flight',receive:'Capturing',transfer:'Transmitting to chip',
@@ -54,7 +52,7 @@ export function createSignalPipeline(host) {
   const bars = all('.sl-spectrum > div');
   const mixedCells = all('[data-mixed-band]'), cleanCells = all('[data-clean-band]');
   const fits = all('.sl-fit-row'), steps = all('[data-step]');
-  let model,selected,receiveTimes,first,previousPhase,previousCount;
+  let model,selected,receiveTimes,first,previousPhase,previousCount,previousStep;
 
   function update(next,selectedId) {
     model=next;
@@ -68,17 +66,24 @@ export function createSignalPipeline(host) {
   function render(time,reducedMotion) {
     const elapsed=reducedMotion ? Infinity : time;
     const count=receiveTimes.filter(t=>elapsed>=t).length;
-    const filtered=elapsed>=AI_START, fitted=elapsed>=fitStart, located=elapsed>=locateStart;
-    const complete=elapsed>=OUTPUT_START;
-    const phase=complete?'output':located?'locate':fitted?'fit':filtered?'filter':count===4?'transfer':count?'receive':'emit';
-    if (phase===previousPhase && count===previousCount && host.dataset.static===String(reducedMotion)) return;
+    const step=computeStep(elapsed), complete=step.phase==='output';
+    const located=step.phase==='locate' || complete, fitted=step.phase==='fit' || located;
+    const filtered=step.phase!=='capture';
+    const phase=filtered?step.phase:count===4?'transfer':count?'receive':'emit';
+    const computing=filtered && !complete;
+    if (computing) {
+      const progress=(elapsed-AI_START)/(OUTPUT_START-AI_START);
+      host.style.setProperty('--sl-light-angle',Math.round(360*progress)+'deg');
+    }
+    if (phase===previousPhase && count===previousCount && step.count===previousStep && host.dataset.static===String(reducedMotion)) return;
+    host.dataset.computing=String(computing);
     host.dataset.phase=phase;
     host.dataset.stage=complete?'output':filtered?'classify':count?'receive':'emit';
     host.dataset.static=String(reducedMotion);
     find('.sl-path-status').textContent='Simulation · '+stages[phase]+(phase==='receive'?' · '+count+'/4':'');
-    for (const step of steps) {
-      if (step.dataset.step===phase) step.setAttribute('aria-current','step');
-      else step.removeAttribute('aria-current');
+    for (const section of steps) {
+      if (section.dataset.step===phase) section.setAttribute('aria-current','step');
+      else section.removeAttribute('aria-current');
     }
     micRows.forEach((row,i)=>{
       const received=elapsed>=receiveTimes[i];
@@ -88,19 +93,21 @@ export function createSignalPipeline(host) {
     find('[data-first-mic]').textContent=count ? (first/1000).toFixed(2)+' ms' : '—';
     bars.forEach((bar,i)=>{
       bar.firstElementChild.style.height=(filtered ? model.inputSpectrum[i]*100 : 0)+'%';
-      bar.lastElementChild.style.height=(filtered ? model.cleanSpectrum[i]*100 : 0)+'%';
+      const ready=filtered && (phase!=='filter' || i<step.count);
+      bar.lastElementChild.style.height=(ready ? model.cleanSpectrum[i]*100 : 0)+'%';
       mixedCells[i].textContent=filtered?model.bandLevels[i].toFixed(1):'—';
-      cleanCells[i].textContent=filtered?model.filteredLevels[i].toFixed(1):'—';
+      cleanCells[i].textContent=ready?model.filteredLevels[i].toFixed(1):'—';
     });
-    find('[data-pipeline-noise]').textContent=filtered ? model.noiseReductionDb.toFixed(1)+' dB reduction' : '—';
+    find('[data-pipeline-noise]').textContent=fitted || (filtered && step.count===bars.length) ? model.noiseReductionDb.toFixed(1)+' dB reduction' : '—';
     fits.forEach((row,i)=>{
       const pct=model.classShares[i]*100;
-      row.querySelector('b').style.width=(fitted?pct:0)+'%';
-      row.querySelector('output').textContent=fitted?Math.round(pct)+'%':'—';
-      row.classList.toggle('sl-winner',fitted && sounds[i].name===model.detected.name);
+      const ready=fitted && (phase!=='fit' || i<step.count);
+      row.querySelector('b').style.width=(ready?pct:0)+'%';
+      row.querySelector('output').textContent=ready?Math.round(pct)+'%':'—';
+      row.classList.toggle('sl-winner',(located || (fitted && step.count===fits.length)) && sounds[i].name===model.detected.name);
     });
     find('[data-fit-ew]').textContent=located?signed(model.delays[3]-model.delays[1]):'—';
-    find('[data-fit-ns]').textContent=located?signed(model.delays[2]-model.delays[0]):'—';
+    find('[data-fit-ns]').textContent=complete || (located && step.count===2)?signed(model.delays[2]-model.delays[0]):'—';
     find('[data-pipeline-result]').textContent=complete?model.detected.name:'Listening';
     find('[data-pipeline-bearing]').textContent=complete && model.hasBearing
       ? compass[Math.round(model.degree/45)%8]+' · '+model.dialState.degree+'°' : '—';
@@ -108,6 +115,7 @@ export function createSignalPipeline(host) {
     find('[data-lab-score]').textContent=complete?Math.round(model.confidence*100)+'%':'—';
     previousPhase=phase;
     previousCount=count;
+    previousStep=step.count;
   }
   return {update,render};
 }

@@ -1,7 +1,13 @@
 .sl-pipeline {
   align-self:stretch; min-width:0; min-height:0; overflow:auto; scrollbar-width:thin;
-  display:flex; flex-direction:column; gap:0; border:1px solid #d8d8e4; border-radius:10px;
+  display:flex; flex-direction:column; gap:0; border:2px solid #d8d8e4; border-radius:10px;
   background:#fff; color:#25263c;
+}
+.sl-pipeline[data-computing=true] {
+  border-color:transparent;
+  background:linear-gradient(white,white) padding-box,
+    conic-gradient(from var(--sl-light-angle,0deg),#d8d8e4 0 65%,#bcb1d6 76%,#8664be 84%,#adc5fa 91%,#d8d8e4) border-box;
+  box-shadow:0 0 9px #997cc223;
 }
 .sl-path-head,.sl-step-head,.sl-readout-line,.sl-spectrum-foot,.sl-path-lags,.sl-output {display:flex;align-items:center;justify-content:space-between;gap:8px}
 .sl-path-head,.sl-stage-block,.sl-output {padding:clamp(10px,1.65vh,20px) clamp(13px,1.5vw,26px)}
