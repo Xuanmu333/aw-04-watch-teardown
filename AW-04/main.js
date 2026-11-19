@@ -191,10 +191,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   canvas.onpointerup=canvas.onpointercancel=()=>drag=null;
   canvas.addEventListener('wheel',e=>{e.preventDefault();user();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
   const workspaceSwitch=$('.workspace-switch'),labHost=$('#soundLab');
-  let lab=null,inLab=false,heldTime=0;
-  workspaceSwitch?.addEventListener('click',event=>{
-    const button=event.target.closest('button');
-    if(!button)return;
+  let lab=null,inLab=false,heldTime=0,labClock=0;
+  function selectWorkspace(button){
     const next=button.getAttribute('aria-controls')==='soundLab';
     if(next===inLab)return;
     if(next){
@@ -211,9 +209,57 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     for(const choice of workspaceSwitch.querySelectorAll('button'))choice.setAttribute('aria-pressed',choice===button);
     if(next){
       lab??=createSoundLab(labHost);
-      lab.render(lastT);
+      lab.replay();
     }else resize();
-  });
+  }
+  if(workspaceSwitch){
+    const [teardownButton,labButton]=workspaceSwitch.querySelectorAll('button');
+    let gesture=null,suppressClick=false;
+    workspaceSwitch.addEventListener('click',event=>{
+      const button=event.target.closest('button');
+      if(button&&(!suppressClick||event.detail===0))selectWorkspace(button);
+    });
+    workspaceSwitch.addEventListener('pointerdown',event=>{
+      const button=event.target.closest('button');
+      if(!button||event.button!==0||!event.isPrimary)return;
+      suppressClick=false;
+      const position=new DOMMatrixReadOnly(getComputedStyle(workspaceSwitch,'::before').transform).m41;
+      const travel=labButton.getBoundingClientRect().left-teardownButton.getBoundingClientRect().left;
+      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,position,travel,dragging:false};
+      button.setPointerCapture(event.pointerId);
+    });
+    function moveThumb(event){
+      const dx=event.clientX-gesture.x;
+      if(!gesture.dragging){
+        if(Math.abs(dx)<5||Math.abs(dx)<Math.abs(event.clientY-gesture.y))return;
+        gesture.dragging=true;
+        workspaceSwitch.classList.add('is-dragging');
+      }
+      const offset=Math.max(0,Math.min(gesture.travel,gesture.position+dx));
+      workspaceSwitch.style.setProperty('--thumb-offset',offset+'px');
+      return offset;
+    }
+    workspaceSwitch.addEventListener('pointermove',event=>{
+      if(gesture?.id===event.pointerId)moveThumb(event);
+    });
+    function finishGesture(event){
+      if(gesture?.id!==event.pointerId)return;
+      if(event.type==='pointerup'){
+        const offset=moveThumb(event);
+        if(offset!==undefined){
+          const target=offset>=gesture.travel/2?labButton:teardownButton;
+          selectWorkspace(target);
+          target.focus({preventScroll:true});
+        }
+      }
+      suppressClick=gesture.dragging;
+      gesture=null;
+      workspaceSwitch.classList.remove('is-dragging');
+      workspaceSwitch.style.removeProperty('--thumb-offset');
+    }
+    workspaceSwitch.addEventListener('pointerup',finishGesture);
+    workspaceSwitch.addEventListener('lostpointercapture',finishGesture);
+  }
   app.addEventListener('pointerdown',e=>{if(!film&&!inLab&&!e.target.closest('.play,.workspace-switch'))user();});
   // Keep the teardown runtime's global shortcuts out of the lab's keyboard controls.
   window.addEventListener('keydown',e=>{if(inLab||workspaceSwitch?.contains(e.target))e.stopImmediatePropagation();});
@@ -276,14 +322,15 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     c.beginPath();c.moveTo(0,0);c.lineTo(66*Math.cos(a),66*Math.sin(a));c.strokeStyle='#614cb4';c.lineWidth=3;c.stroke();c.beginPath();c.arc(0,0,4,0,7);c.fillStyle='#6251ad';c.fill();
   }
   function render(raw){
+    if(inLab)labClock+=(raw-lastT+tl.duration)%tl.duration;
     lastT=raw;
-    if(inLab){lab.render(raw);return;}
+    if(inLab){lab.render(labClock);return;}
     if(!film&&manual&&!drag&&performance.now()-idle>25000&&!document.querySelector('.sound-editor[open]'))restart();
     const t=(raw-tourOffset+tl.duration)%tl.duration;
     if(!manual){const a=tour(t);current={...a,bearing:sounds[a.src].angle};}
     if(manual&&opening!==null){const x=Math.min(1,(performance.now()-opening)/1450);current.explode=x*x*(3-2*x);if(x===1)opening=null;}
     const c=current,id=c.stage,s=acousticState(c.src,c.bearing,t,catalog);
-    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','LRA'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
+    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','VIBRATOR'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
       $$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.stage)===id));}
     if(lastSound!==c.src){lastSound=c.src;$$('.options button').forEach((b,i)=>b.setAttribute('aria-pressed',c.src===i));}
     $$('.partlist button').forEach((b,i)=>b.setAttribute('aria-pressed',sel===i||(id===2&&i===4)||(id===3&&i===3)||(id===5&&i===7)));

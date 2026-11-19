@@ -96,10 +96,17 @@ footer{padding:0 1.4% 12px;z-index:2}.consolefoot{width:61%;margin:auto;padding:
   html,body{height:auto;overflow:visible}
 }
 
-.workspace-switch{display:flex;flex:none;align-items:center;gap:2px;padding:3px;border:1px solid #dcdde4;border-radius:8px;background:#fff}
-.workspace-switch button{min-height:30px;padding:4px 13px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:12px}
-.workspace-switch button[aria-pressed=true]{background:#ede9f6;color:#54378e;box-shadow:none}
+.workspace-switch{--switch-gap:2px;--thumb-offset:0px;position:relative;display:grid;grid-template-columns:repeat(2,1fr);flex:none;gap:var(--switch-gap);padding:3px;border:1px solid #dcdde4;border-radius:8px;background:#fff;touch-action:pan-y;user-select:none}
+.workspace-switch::before{content:'';position:absolute;grid-area:1/1/2/2;inset:0;border-radius:5px;background:#e9e2f5;box-shadow:inset 0 0 0 1px #7454a21a;pointer-events:none;transform:translateX(var(--thumb-offset))}
+.workspace-switch:has([aria-controls="soundLab"][aria-pressed="true"]){--thumb-offset:calc(100% + var(--switch-gap))}
+.workspace-switch button{position:relative;min-height:30px;padding:4px 13px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:12px}
+.workspace-switch button[aria-pressed=true]{color:#54378e;box-shadow:none}
 .workspace-switch button:hover{color:#493180}
+@media(prefers-reduced-motion:no-preference){
+  .workspace-switch::before{transition:transform 340ms cubic-bezier(.42,0,.22,1)}
+  .workspace-switch button{transition:color 180ms ease}
+  .workspace-switch.is-dragging::before{transition:none}
+}
 #soundLab{min-width:0;min-height:0}
 @media(max-width:760px){
   #app:not(.film){grid-template-rows:auto auto auto}

@@ -1,0 +1,20 @@
+.sl-sound-waves {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  pointer-events:none;
+  fill:none;
+  stroke:currentColor;
+  mask-image:linear-gradient(to right,transparent,#000 7%,#000 93%,transparent),
+             linear-gradient(to bottom,transparent,#000 7%,#000 93%,transparent);
+  mask-composite:intersect;
+}
+.sl-sound-waves [data-wave-source] {color:#8c6ba6;opacity:.49}
+.sl-sound-waves [data-wave-selected="true"] {color:#8144bd;opacity:.96}
+.sl-wave-compression {stroke-opacity:.19}
+.sl-sound-waves [data-wave-crest] {vector-effect:non-scaling-stroke}
+.sl-sound-waves [data-wave-crest="0"] {stroke-width:1.75}
+.sl-sound-waves [data-wave-crest="1"] {stroke-width:1.2;stroke-opacity:.66}
+.sl-sound-waves [data-wave-crest="2"] {stroke-width:1;stroke-opacity:.39}

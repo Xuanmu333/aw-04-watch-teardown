@@ -1,5 +1,6 @@
 // Concept dimensions in millimetres. +Y is twelve o'clock, +X is three.
 export const radius = 17;
+export const speedOfSound = 343; // Metres per second in the simulated air.
 export const microphones = [[0,radius],[radius,0],[0,-radius],[-radius,0]];
 export const sounds = [
   {name:'Doorbell', en:'DOORBELL', angle:48, bins:[.03,.10,.93,.82,.18,.07,.02,.01]},
@@ -8,7 +9,7 @@ export const sounds = [
 ];
 export function acousticState(source, bearing, t, catalog = sounds) {
   const rad = bearing*Math.PI/180;
-  const arrivals = microphones.map(([x,y])=>-(x*Math.sin(rad)+y*Math.cos(rad))*1000/343);
+  const arrivals = microphones.map(([x,y])=>-(x*Math.sin(rad)+y*Math.cos(rad))*1000/speedOfSound);
   const first = Math.min(...arrivals);
   const delays = arrivals.map(v=>v-first);
   const angle = (360+Math.atan2(delays[3]-delays[1], delays[2]-delays[0])*180/Math.PI)%360;

@@ -1,8 +1,5 @@
-import { microphones, radius, sounds } from './acoustics.js';
+import { microphones, radius, sounds, speedOfSound } from './acoustics.js';
 
-// The sound field extends four metres from the watch to each edge of the pad.
-const fieldRadius = 4;
-const speedOfSound = 343;
 const referenceDb = 65;
 const oneMetreDb = [67, 69, 68];
 const power = db => 10 ** ((db - referenceDb) / 10);
@@ -28,22 +25,32 @@ function fitBands(bands) {
 }
 
 function emit(source) {
-  const { x, y, type } = source;
-  const east = x * fieldRadius, north = y * fieldRadius;
+  // Source coordinates are in metres. The watch's microphone layout is in millimetres.
+  const { x: east, y: north, type } = source;
   const range = Math.hypot(east, north);
-  const levelDb = oneMetreDb[type] - 20 * Math.log10(Math.max(0.35, range));
-  const arrivals = microphones.map(([mx, my]) => Math.hypot(east - mx / 1000, north - my / 1000) / speedOfSound * 1e6);
+  const distances = microphones.map(([mx, my]) => Math.hypot(east - mx / 1000, north - my / 1000));
+  const arrivals = distances.map(distance => distance / speedOfSound * 1e6);
   const first = Math.min(...arrivals);
   const delays = arrivals.map(time => time - first);
-  const shape = unitPower(templates[type].map((value, i) => value * Math.exp(-0.0009 * range * i)));
-  const bands = shape.map(value => value * power(levelDb));
-  return { source, range, levelDb, delays, bands };
+  const micBands = distances.map(distance => {
+    const energy = power(oneMetreDb[type]) / Math.max(0.35, distance) ** 2;
+    const shape = unitPower(templates[type].map((value, i) => value * Math.exp(-0.0009 * distance * i)));
+    return shape.map(value => value * energy);
+  });
+  const bands = floor.map((_, b) => sum(micBands.map(channel => channel[b])) / microphones.length);
+  return { source, range, levelDb:decibels(sum(bands)), arrivalsUs:arrivals, delays, bands, micBands };
 }
 
 export function analyzeScene(sources) {
   const signals = sources.map(emit);
-  const mixture = floor.map((noise, b) => noise + sum(signals.map(signal => signal.bands[b])));
-  const weights = fitBands(mixture.map((value, b) => value - floor[b]));
+  // Each capsule receives its own mixture. Combine its fitted class powers
+  // with the other channels to choose the foreground sound.
+  const channels = microphones.map((_, mic) => {
+    const bands = floor.map((noise, b) => noise + sum(signals.map(signal => signal.micBands[mic][b])));
+    return {bands, weights:fitBands(bands.map((value, b) => value - floor[b]))};
+  });
+  const mixture = floor.map((_, b) => sum(channels.map(channel => channel.bands[b])) / channels.length);
+  const weights = templates.map((_, k) => sum(channels.map(channel => channel.weights[k])) / channels.length);
   const winner = weights.indexOf(Math.max(...weights));
   const dominant = templates[winner].map(value => value * weights[winner]);
   const background = mixture.map((value, b) => Math.max(floor[b], value - dominant[b]));
@@ -53,10 +60,10 @@ export function analyzeScene(sources) {
   const backgroundOut = dot(background, gain);
   const noiseReductionDb = backgroundOut > 0 ? 10 * Math.log10(sum(background) / backgroundOut) : 0;
   const streamPower = weights[winner];
-  const arrivals = microphones.map((_, mic) => {
-    if (!streamPower) return 0;
-    const moments = floor.map((_, b) => sum(signals.map(signal => signal.bands[b] * signal.delays[mic])));
-    return fitBands(moments)[winner] / streamPower;
+  const arrivals = channels.map((channel, mic) => {
+    if (!channel.weights[winner]) return 0;
+    const moments = floor.map((_, b) => sum(signals.map(signal => signal.micBands[mic][b] * signal.delays[mic])));
+    return fitBands(moments)[winner] / channel.weights[winner];
   });
   const first = Math.min(...arrivals);
   const maxDelay = 2 * radius * 1000 / speedOfSound;
@@ -74,11 +81,13 @@ export function analyzeScene(sources) {
   const inputSpectrum = mixture.map(value => value / peak);
   const cleanSpectrum = output.map(value => value / peak);
   const confidence = streamPower ? dot(dominant, gain) / sum(output) : 0;
-  const telemetry = signals.map(({ source, range, levelDb, bands }) => ({
-    id: source.id, range, levelDb, cleanDb: decibels(dot(bands, gain))
+  const telemetry = signals.map(({ source, range, levelDb, arrivalsUs, bands }) => ({
+    id: source.id, type:source.type, range, levelDb, arrivalsUs, cleanDb: decibels(dot(bands, gain))
   }));
+  const totalFittedPower = sum(weights);
+  const classShares = weights.map(weight => totalFittedPower ? weight / totalFittedPower : 0);
   return {
-    sources: telemetry, primaryId: primary?.source.id ?? null, detected, degree, hasBearing,
+    sources: telemetry, primaryId: primary?.source.id ?? null, classShares, detected, degree, hasBearing,
     delays, confidence: Math.min(1, confidence), inputSpectrum, cleanSpectrum, noiseReductionDb,
     dialState: { angle: degree, degree: hasBearing ? String(Math.round(degree) % 360).padStart(3, '0') : '—', hasBearing, detected }
   };
