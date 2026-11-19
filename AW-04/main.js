@@ -170,9 +170,9 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
     previewTiming = [];
     pulseStart = -Infinity;
   }
-  function selectSound(index) {
+  function selectSound(index, angle = null) {
     stopPreview();
-    setAngleDemo(null);
+    setAngleDemo(angle);
     useLabResult=false;
     current.src = index;
     current.bearing = catalog[index].angle;
@@ -220,7 +220,7 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
       preview.dataset.try = sound.en;
       preview.setAttribute('aria-label','Test vibration: ' + label);
       preview.onclick = () => {
-        selectSound(index);
+        selectSound(index, demoAngle === null ? null : bearingSlider.valueAsNumber);
         const rect = stage.getBoundingClientRect();
         if (rect.top < 0 || rect.bottom > window.innerHeight) stage.scrollIntoView({block:'center',behavior:'instant'});
         feedback.textContent = startVibration(sound);
