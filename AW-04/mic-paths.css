@@ -18,20 +18,11 @@
 .sl-mic-paths [data-received="true"] .sl-mic-pin {fill:#c699ff;stroke:#fff}
 .sl-mic-ring {fill:none;stroke:#945bd2;stroke-width:1.6;opacity:0}
 .sl-mic-leader {stroke:#8a729e;stroke-width:1}
-.sl-mic-paths [data-mic-handoff="hidden"],
-.sl-mic-paths [data-mic-handoff="process"] .sl-mic-bus-pulse {display:none}
-.sl-mic-bus {stroke:#efd8ff;stroke-width:1.6}
-.sl-mic-bus-pulse {fill:#fff;stroke:#9d69df;stroke-width:1}
-.sl-mic-chip-pins {fill:none;stroke:#e0c5ff;stroke-width:1.25;vector-effect:non-scaling-stroke}
-.sl-mic-chip rect {fill:#432b61;stroke:#f0dcff;stroke-width:1.3;vector-effect:non-scaling-stroke}
-.sl-mic-chip text {font:700 8px var(--mono);fill:white}
-.sl-mic-paths [data-mic-handoff="process"] .sl-mic-bus {stroke:#bb9bd7;stroke-opacity:.8}
-.sl-mic-paths [data-mic-handoff="process"] .sl-mic-chip rect {fill:#794bbb;stroke:#fff}
-.sl-plane .sl-node.sl-over-chip {
+.sl-plane .sl-node.sl-over-receiver {
   background:transparent;
   border-color:#b8a3d0;
 }
-.sl-plane .sl-node.sl-over-chip > svg {
+.sl-plane .sl-node.sl-over-receiver > svg {
   position:absolute;
   left:-12%;
   top:-12%;

@@ -89,6 +89,7 @@ export function analyzeScene(sources) {
   return {
     sources: telemetry, primaryId: primary?.source.id ?? null, classShares, detected, degree, hasBearing,
     delays, confidence: Math.min(1, confidence), inputSpectrum, cleanSpectrum, noiseReductionDb,
+    bandLevels: mixture.map(decibels), filteredLevels: output.map(decibels),
     dialState: { angle: degree, degree: hasBearing ? String(Math.round(degree) % 360).padStart(3, '0') : '—', hasBearing, detected }
   };
 }

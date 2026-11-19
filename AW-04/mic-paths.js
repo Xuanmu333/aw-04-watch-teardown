@@ -1,9 +1,9 @@
 import { microphones, radius, speedOfSound } from './acoustics.js';
-import { AI_START, OUTPUT_START, receiveTime, waveTimeUs } from './signal-timing.js';
+import { receiveTime, waveTimeUs } from './signal-timing.js';
 import './mic-paths.css';
 
 const svgNS = 'http://www.w3.org/2000/svg';
-// The 52 mm watch artwork occupies 31% of the 200-unit field.
+// The 52 mm watch viewport occupies 31% of the 200-unit field.
 const watchUnitsPerMm = 200 * .31 / 52;
 const capsules = microphones.map(([x,y]) => [x * watchUnitsPerMm, -y * watchUnitsPerMm]);
 const aperture = (radius + 5) * watchUnitsPerMm;
@@ -44,29 +44,18 @@ export function createMicPaths(plane) {
   }));
   const band = svgElement('path', {class:'sl-watch-pressure'}, crests);
   const front = svgElement('path', {'data-watch-front':''}, crests);
-  const handoff = svgElement('g', {'data-mic-handoff':'hidden'}, svg);
   const markers = svgElement('g', {}, svg);
   const channels = capsules.map(([x,y],i) => {
     const name = 'M0'+(i+1);
-    const chipX = 7 * Math.sign(x), chipY = 7 * Math.sign(y);
-    svgElement('line', {class:'sl-mic-bus', x1:x, y1:y, x2:chipX, y2:chipY}, handoff);
-    const busPulse = svgElement('circle', {class:'sl-mic-bus-pulse', r:1.7}, handoff);
     const marker = svgElement('g', {'data-mic':name, transform:'translate('+x+' '+y+')'}, markers);
     const leader = svgElement('line', {class:'sl-mic-leader'}, marker);
     const ring = svgElement('circle', {class:'sl-mic-ring', r:3.4}, marker);
     svgElement('circle', {class:'sl-mic-pin', r:2.15}, marker);
     const label = svgElement('text', {class:'sl-mic-label', 'text-anchor':'middle', dy:'.34em'}, marker);
     label.textContent = name;
-    return {x, y, marker, leader, ring, label, chipX, chipY, busPulse, arrival:0};
+    return {x, y, marker, leader, ring, label, arrival:0};
   });
-  const chip = svgElement('g', {class:'sl-mic-chip'}, handoff);
-  svgElement('path', {class:'sl-mic-chip-pins',
-    d:'M-4 -9v3 M0 -9v3 M4 -9v3 M-4 9v-3 M0 9v-3 M4 9v-3 M-9 -4h3 M-9 0h3 M-9 4h3 M9 -4h-3 M9 0h-3 M9 4h-3'
-  }, chip);
-  svgElement('rect', {x:-7,y:-7,width:14,height:14,rx:1.7}, chip);
-  const chipText = svgElement('text', {'text-anchor':'middle',dy:'.34em'}, chip);
-  chipText.textContent = 'AI';
-  let distance = 0, arrivalsUs, lastArrival = 0, staticFrameDrawn = false;
+  let distance = 0, arrivalsUs, staticFrameDrawn = false;
 
   function layoutLabels() {
     const field = svg.getBoundingClientRect();
@@ -82,7 +71,7 @@ export function createMicPaths(plane) {
     for (const node of plane.querySelectorAll('.sl-node:not([hidden])')) {
       const rect = node.getBoundingClientRect();
       const placeLeft = rect.left + rect.width/2 < centerX;
-      node.classList.toggle('sl-over-chip', coversReceiver(rect));
+      node.classList.toggle('sl-over-receiver', coversReceiver(rect));
       const caption = node.querySelector('.sl-node-label');
       caption.style.removeProperty('--caption-shift');
       const captionRect = caption.getBoundingClientRect();
@@ -135,7 +124,6 @@ export function createMicPaths(plane) {
     channels.forEach((channel,i) => {
       channel.arrival = receiveTime(arrivalsUs,i);
     });
-    lastArrival = Math.max(...channels.map(channel => channel.arrival));
     layoutLabels();
   }
 
@@ -150,22 +138,13 @@ export function createMicPaths(plane) {
     front.setAttribute('d',edge);
     band.setAttribute('d',waveArc(distance,r-1));
     for (const {offset,path} of trails) path.setAttribute('d',waveArc(distance,r-offset));
-    const handoffVisible = !reducedMotion && elapsedSeconds >= lastArrival && elapsedSeconds < OUTPUT_START;
-    const transferring = handoffVisible && elapsedSeconds < AI_START;
-    const state = handoffVisible ? (transferring ? 'transfer' : 'process') : 'hidden';
-    if (handoff.dataset.micHandoff !== state) handoff.dataset.micHandoff = state;
-    const transferProgress = transferring ? (elapsedSeconds - lastArrival) / (AI_START - lastArrival) : 0;
-    for (const {x,y,marker,ring,arrival,chipX,chipY,busPulse} of channels) {
+    for (const {marker,ring,arrival} of channels) {
       const age = elapsedSeconds - arrival;
       const received = reducedMotion || age >= 0;
       marker.setAttribute('data-received',String(received));
       const flash = !reducedMotion && age >= 0 && age < .45;
       ring.style.opacity = flash ? 1 - age / .45 : 0;
       if (flash) ring.setAttribute('r',3.4 + 5 * age / .45);
-      if (transferring) {
-        busPulse.setAttribute('cx',x + (chipX - x) * transferProgress);
-        busPulse.setAttribute('cy',y + (chipY - y) * transferProgress);
-      }
     }
   }
 

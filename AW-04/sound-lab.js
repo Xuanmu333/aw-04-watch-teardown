@@ -1,11 +1,10 @@
 import {sounds} from './acoustics.js';
 import {analyzeScene} from './lab-acoustics.js';
-import {makeDial} from './dial.js';
+import {createChipFlow} from './chip-flow.js';
 import {createMicPaths} from './mic-paths.js';
 import {createSoundWaves} from './sound-waves.js';
 import {createSignalPipeline} from './signal-pipeline.js';
-import {CYCLE_DURATION} from './signal-timing.js';
-import watchFront from './watch-front.webp';
+import {AI_START, OUTPUT_START} from './signal-timing.js';
 import './sound-lab.css';
 
 const axisLimit = 8; // Metres from the watch to an edge of the map.
@@ -19,10 +18,7 @@ const iconPaths = [
   '<path d="m3.5 12 1.8-5h11.5l2.1 5M3 16.8v-4.4l2-1.2h12.5l2 1.2v4.4H3ZM5.2 17v2m12-2v2M6 14h2m6 0h2.2"/>',
   '<path d="M5 18.3h14.1M6.8 16.8v-5a5.2 5.2 0 0 1 10.4 0v5M9.3 11.3a2.9 2.9 0 0 1 2-2.3M12 2v1.8M3.8 5l1.4 1.2M20.2 5l-1.4 1.2"/>',
 ];
-const directions = ['N','E','S','W'];
 const icon = type => '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">'+iconPaths[type]+'</svg>';
-const bearingText = value => String(Math.round(value) % 360).padStart(3,'0')+'°';
-const delayText = us => (Math.round(us)>0 ? '+' : Math.round(us)<0 ? '−' : '')+Math.abs(Math.round(us))+' µs';
 const limit = value => Math.max(-axisLimit,Math.min(axisLimit,value));
 const plotPercent = metres => 100*metres/axisLimit;
 const meters = value => (value >= 0 ? '+' : '−') + Math.abs(value).toFixed(1)+' m';
@@ -40,93 +36,70 @@ function fieldGrid() {
     '<g class="sl-grid-distance"><text x="179" y="179">'+axisLimit/2+' m</text><text x="112" y="111">'+axisLimit+' m</text></g></svg>';
 }
 
-export function createSoundLab(host) {
+export function createSoundLab(host, {onDialState} = {}) {
   const sources = initialSources.map(source=>({...source}));
   let mode='single', selected=sources[0], model;
-  const dial=makeDial();
   const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
   host.innerHTML=`
-    <div class="sl-column sl-left">
-      <section class="sl-card">
-        <h2>Sound sources <small data-lab-count></small></h2>
-        <div class="sl-types" aria-label="Sound category">${sources.map(s=>'<button data-lab-type="'+s.type+'">'+sounds[s.type].name+'</button>').join('')}</div>
-        <div class="sl-source-list">${sources.map(s=>`
-          <button class="sl-source" data-lab-row="${s.id}" aria-label="Select ${sounds[s.type].name}">
-            <span class="sl-source-heading"><span class="sl-small-icon">${icon(s.type)}</span><strong>${sounds[s.type].name}</strong><span class="sl-source-role"></span></span>
-            <span class="sl-source-metrics"><span>Received <b data-level></b></span><span>Filtered <b data-clean></b></span><span>Range <b data-range></b></span></span>
-          </button>`).join('')}
-        </div>
-      </section>
-      <section class="sl-card">
-        <h2>Source position</h2>
-        <div class="sl-position-id"><i></i><strong data-lab-selected></strong></div>
-        ${['x','y'].map((axis,i)=>`<label class="sl-position"><span>${i?'Y · North':'X · East'}</span><output data-axis-value="${axis}"></output><input aria-label="${i?'North':'East'} position in metres" data-lab-axis="${axis}" type="range" min="${-axisLimit}" max="${axisLimit}" step="0.1"></label>`).join('')}
-      </section>
-    </div>
     <div class="sl-field">
       <div class="sl-field-top"><h2>Acoustic field</h2><div class="sl-mode" role="group" aria-label="Source mode"><button data-lab-mode="single">Single source</button><button data-lab-mode="multi">Multiple sources</button></div></div>
-      <div class="sl-map-wrap"><div class="sl-map" data-lab-map>
-        ${fieldGrid()}
-        <div class="sl-plane" data-lab-travel>
-          <div class="sl-watch"><img src="${watchFront}" alt="" draggable="false"><div class="sl-dial-mount"></div></div>
-          ${sources.map(s=>`<button type="button" class="sl-node" data-lab-node="${s.id}" aria-label="Move ${sounds[s.type].name}" aria-describedby="slMoveHelp">${icon(s.type)}<span class="sl-node-label">${sounds[s.type].name}</span></button>`).join('')}
+      <div class="sl-universe">
+        <div class="sl-map-wrap"><div class="sl-map" data-lab-map>
+          ${fieldGrid()}
+          <div class="sl-plane" data-lab-travel>
+            <div class="sl-watch" role="img" aria-label="Watch receiver"></div>
+            ${sources.map(s=>`<button type="button" class="sl-node" data-lab-node="${s.id}" aria-label="Move ${sounds[s.type].name}" aria-describedby="slMoveHelp">${icon(s.type)}<span class="sl-node-label">${sounds[s.type].name}</span></button>`).join('')}
+          </div>
+        </div></div>
+        <div class="sl-chip-core"></div>
+      </div>
+      <div class="sl-field-foot"><span id="slMoveHelp">Drag a source or use the arrow keys.</span><span>Watch enlarged · timing slowed</span></div>
+      <section class="sl-controls" aria-label="Sound source controls">
+        <div class="sl-source-controls">
+          <div class="sl-control-head"><h3>Sound sources</h3>
+            <div class="sl-types" role="group" aria-label="Sound category">${sources.map(s=>'<button data-lab-type="'+s.type+'">'+sounds[s.type].name+'</button>').join('')}</div>
+          </div>
+          <div class="sl-source-list">${sources.map(s=>`
+            <button class="sl-source" data-lab-row="${s.id}" aria-label="Select ${sounds[s.type].name}">
+              <span class="sl-source-heading"><span class="sl-small-icon">${icon(s.type)}</span><strong>${sounds[s.type].name}</strong><span class="sl-source-role"></span></span>
+              <span class="sl-source-metrics"><span>Received <b data-level></b></span><span>Filtered <b data-clean></b></span><span>Range <b data-range></b></span></span>
+            </button>`).join('')}
+          </div>
         </div>
-      </div></div>
-      <div class="sl-field-foot"><span id="slMoveHelp">Drag a source or use the arrow keys. Follow its waves to the watch.</span><span>WATCH ENLARGED</span></div>
-      <div class="sl-pipeline-host"></div>
+        <div class="sl-position-controls">
+          <div class="sl-control-head"><h3>Source position</h3><strong data-lab-selected></strong></div>
+          <div class="sl-axes">${['x','y'].map((axis,i)=>`<label class="sl-position"><span>${i?'North':'East'}</span><output data-axis-value="${axis}"></output><input aria-label="${i?'North':'East'} position in metres" data-lab-axis="${axis}" type="range" min="${-axisLimit}" max="${axisLimit}" step="0.1"></label>`).join('')}</div>
+        </div>
+      </section>
     </div>
-    <div class="sl-column sl-right">
-      <section class="sl-card sl-ai">
-        <h2>AI chip <small>SIMULATED</small></h2>
-        <p class="sl-ai-label">Primary sound</p>
-        <strong class="sl-result" data-lab-result aria-live="polite"></strong>
-        <div class="sl-ai-data"><div><span>Bearing</span><b data-lab-bearing></b></div><div><span>Signal purity</span><b data-lab-score></b></div></div>
-      </section>
-      <section class="sl-card sl-separation">
-        <h2>Noise suppression</h2>
-        <div class="sl-band-chart" role="img" aria-label="Mixed input and isolated output power in eight frequency bands">
-          ${Array.from({length:8},()=>'<div><i></i><b></b></div>').join('')}
-        </div>
-        <div class="sl-frequency"><span>Low</span><span>Frequency</span><span>High</span></div>
-        <div class="sl-key"><span>Mixed input</span><span>Filtered</span></div>
-        <div class="sl-measure"><span>Noise reduction</span><b data-lab-reduction></b></div>
-      </section>
-      <section class="sl-card sl-arrival">
-        <h2>Primary mic delays <small>34 MM</small></h2>
-        ${directions.map((d,i)=>`<div class="sl-channel"><span>M0${i+1} · ${d}</span><i><b></b></i><output data-lab-delay="${i}"></output></div>`).join('')}
-        <div class="sl-tdoa"><div><span>W − E</span><b data-lab-ew></b></div><div><span>S − N</span><b data-lab-ns></b></div></div>
-        <p class="sl-equation">Bearing = atan2(W − E, S − N)</p>
-      </section>
-    </div>`;
+    <section class="sl-pipeline-host" aria-label="AI signal analysis"></section>`;
   host.classList.add('sound-lab');
   const one = query=>host.querySelector(query);
   const all = query=>Array.from(host.querySelectorAll(query));
   const plane=one('[data-lab-travel]');
   const waves=createSoundWaves(plane,axisLimit);
   const paths=createMicPaths(plane);
+  const chipFlow=createChipFlow(one('.sl-universe'),one('.sl-chip-core'));
   const pipeline=createSignalPipeline(one('.sl-pipeline-host'));
-  let lastFrame=0,cycleStart=0;
-  const dialCanvas=dial.texture.image;
-  dialCanvas.setAttribute('role','img');
-  one('.sl-dial-mount').append(dialCanvas);
-
+  const receiver=one('.sl-watch');
+  let lastFrame=0,cycleStart=0,shownDialState,displayedSourcePhase;
+  const listening={listening:true,detected:{name:'Listening',en:'LISTENING'},angle:0,degree:'—',hasBearing:false};
   const nodes = new Map(sources.map(source => [source.id,{
     node:one('[data-lab-node="'+source.id+'"]'),
     row:one('[data-lab-row="'+source.id+'"]')
   }]));
   const modeButtons=all('[data-lab-mode]'), typeButtons=all('[data-lab-type]'), axes=all('[data-lab-axis]');
-  const channels=all('.sl-channel'), bands=all('.sl-band-chart > div');
   const visibleSources = ()=>mode==='multi' ? sources : [selected];
   let activeDrag=null;
 
   function refresh(restart=true) {
     model=analyzeScene(visibleSources());
+    displayedSourcePhase='';
     host.dataset.primary=model.primaryId;
     host.dataset.sourceMode=mode;
     modeButtons.forEach(b=>b.setAttribute('aria-pressed',b.dataset.labMode===mode));
     typeButtons.forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.labType)===selected.type));
     one('.sl-types').hidden=mode==='multi';
-    one('[data-lab-count]').textContent=model.sources.length+(model.sources.length===1?' INPUT':' INPUTS');
     one('[data-lab-selected]').textContent=sounds[selected.type].name;
     axes.forEach(input=>{
       const axis=input.dataset.labAxis;
@@ -141,41 +114,20 @@ export function createSoundLab(host) {
       const {node,row}=nodes.get(source.id);
       node.hidden=row.hidden=!item;
       if (!item) continue;
-      const primary=source.id===model.primaryId;
-      node.classList.toggle('sl-primary',primary);
       node.classList.toggle('sl-selected',source===selected);
       const x=plotPercent(source.x), y=-plotPercent(source.y);
       node.style.left=(50+x/2)+'%';
       node.style.top=(50+y/2)+'%';
       node.classList.toggle('sl-label-above',(y<0 && y>-72) || y>72);
       row.setAttribute('aria-pressed',source===selected);
-      row.querySelector('.sl-source-role').textContent=primary?'Primary':'Background';
       row.querySelector('[data-level]').textContent=item.levelDb.toFixed(1)+' dB';
-      row.querySelector('[data-clean]').textContent=item.cleanDb.toFixed(1)+' dB';
       row.querySelector('[data-range]').textContent=item.range.toFixed(1)+' m';
     }
 
-    const result=one('[data-lab-result]');
-    if (result.textContent!==model.detected.name) result.textContent=model.detected.name;
-    one('[data-lab-bearing]').textContent=model.hasBearing===false?'—':bearingText(model.degree);
-    one('[data-lab-score]').textContent=Math.round(model.confidence*100)+'%';
-    one('[data-lab-reduction]').textContent=model.noiseReductionDb.toFixed(1)+' dB';
-    bands.forEach((bar,i)=>{
-      bar.children[0].style.height=(100*model.inputSpectrum[i])+'%';
-      bar.children[1].style.height=(100*model.cleanSpectrum[i])+'%';
-    });
-    channels.forEach((row,i)=>{
-      const us=model.delays[i];
-      row.querySelector('b').style.width=Math.min(100,us)+'%';
-      row.querySelector('output').textContent=Math.round(us)+' µs';
-    });
-    one('[data-lab-ew]').textContent=delayText(model.delays[3]-model.delays[1]);
-    one('[data-lab-ns]').textContent=delayText(model.delays[2]-model.delays[0]);
-    dial.update(model.dialState);
-    dialCanvas.setAttribute('aria-label','Watch shows '+model.detected.name+(model.hasBearing===false?' at receiver':' at '+bearingText(model.degree)));
     const active=visibleSources();
     waves.update(active,model,selected.id);
     paths.update(active,model,selected.id);
+    chipFlow.update(model,selected.id);
     pipeline.update(model,selected.id);
     if(restart)replay();
     else render(lastFrame);
@@ -190,6 +142,7 @@ export function createSoundLab(host) {
     refresh();
   }));
   axes.forEach(input=>{
+    input.addEventListener('pointerdown',replay);
     input.addEventListener('input',()=>{
       selected[input.dataset.labAxis]=Number(input.value);
       refresh(false);
@@ -207,7 +160,7 @@ export function createSoundLab(host) {
       activeDrag={id:event.pointerId,source,x:event.clientX,y:event.clientY,sx:source.x,sy:source.y};
       node.setPointerCapture(event.pointerId);
       node.classList.add('sl-dragging');
-      refresh(false);
+      refresh();
     });
     node.addEventListener('pointermove',event=>{
       if (activeDrag?.id!==event.pointerId || activeDrag.source!==source) return;
@@ -236,10 +189,29 @@ export function createSoundLab(host) {
 
   function render(timeSeconds) {
     lastFrame=timeSeconds;
-    const elapsed=(timeSeconds-cycleStart)%CYCLE_DURATION;
+    const elapsed=Math.max(0,timeSeconds-cycleStart);
     waves.render(elapsed,reducedMotion.matches);
     paths.render(elapsed,reducedMotion.matches);
+    chipFlow.render(elapsed,reducedMotion.matches);
     pipeline.render(elapsed,reducedMotion.matches);
+    const complete=reducedMotion.matches || elapsed>=OUTPUT_START;
+    const sourcePhase=complete?'output':elapsed>=AI_START?'filtered':'receiving';
+    if (sourcePhase!==displayedSourcePhase) {
+      for (const item of model.sources) {
+        const {row,node}=nodes.get(item.id);
+        const primary=item.id===model.primaryId;
+        node.classList.toggle('sl-primary',complete && primary);
+        row.querySelector('.sl-source-role').textContent=complete?(primary?'Primary':'Background'):(item.id===selected.id?'Selected':'');
+        row.querySelector('[data-clean]').textContent=sourcePhase==='receiving'?'—':item.cleanDb.toFixed(1)+' dB';
+      }
+      displayedSourcePhase=sourcePhase;
+    }
+    const dial=complete ? model.dialState : listening;
+    if (dial!==shownDialState) {
+      receiver.setAttribute('aria-label','Watch shows '+dial.detected.name+(dial.hasBearing?' at '+dial.degree+'°':''));
+      onDialState?.(dial);
+      shownDialState=dial;
+    }
   }
   function replay() {
     cycleStart=lastFrame;
@@ -247,5 +219,5 @@ export function createSoundLab(host) {
   }
   one('[data-replay-signal]').addEventListener('click',replay);
   refresh();
-  return {render,replay};
+  return {render,replay,receiver,resize:chipFlow.resize};
 }

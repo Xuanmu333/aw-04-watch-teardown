@@ -45,7 +45,7 @@ export function createSoundEditor(catalog, onSave, onRemove) {
     <label for="customName">Sound name</label>
     <input id="customName" maxlength="24" placeholder="e.g. Washer cycle complete" required>
     <label for="customRhythm">Vibration rhythm</label><select id="customRhythm"></select>
-    <p>Save this sound to simulate it under Sound sources and preview its vibration.</p>
+    <p>Save this alert, then select Test under Sound &amp; vibration to try its rhythm.</p>
     <div class="editor-actions"><button type="button" data-delete>Delete sound</button>
       <button type="button" data-cancel>Cancel</button><button type="submit">Save</button></div>
     </form>`;

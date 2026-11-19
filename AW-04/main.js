@@ -12,38 +12,50 @@ import {rhythms, loadAssignments, saveAssignments, activePulse, drivePhase} from
 
 import {customSound, loadCustomSounds, saveCustomSounds, createSoundEditor} from './custom-sounds.js';
 import {createSoundLab} from './sound-lab.js';
+import {createSceneMotion} from './scene-motion.js';
 
 const film=!!window.__CAPTURE || new URLSearchParams(location.search).has('capture');
 document.documentElement.lang='en';
 runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,title:'AW-04',subtitle:'Four-microphone sound localization watch'},director:{enabled:false}},async({canvas})=>{
   const app=document.querySelector('#app');
   app.classList.toggle('film',film);
-  const tabOrder=[0,1,2,3,5,4];
-  const tabButtons=tabOrder.map(id=>'<button data-stage="'+id+'">'+chapters[id][0]+'</button>').join('');
   const assignments = loadAssignments(film);
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
+  const viewIcons = [
+    '<path d="m12 2 8 5v10l-8 5-8-5V7z M4 7l8 5 8-5m-8 5v10"/>',
+    '<path d="m12 3 9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5"/>',
+    '<path d="M3 10v4m4-7v10m5-14v18m5-14v10m4-7v4"/>'
+  ];
+  const viewButtons = ['Assembled','Exploded','Sound Lab'].map((name,i)=>
+    '<button type="button" data-scene="'+['assembled','exploded','lab'][i]+'" aria-pressed="'+(i===0)+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+viewIcons[i]+'</svg>'+name+'</button>').join('');
+  const overview = ['Watch assembly','Four microphones surround the dial. A purple sector points toward the sound. A vibrator beside the battery sends a distinct pulse pattern to the wrist.'];
+  const partNotes = [
+    'The case holds the stacked electronics. The lugs join the metal bracelet to the case.',
+    'The back cover closes the case and couples the vibrator to the wrist.',
+    'The battery sits inside the case beside the vibrator and supplies the electronics.',
+    'The on-device processor receives four microphone signals. Sound Lab shows the calculations for each listening cycle.',
+    'Four microphones sit at twelve, three, six and nine o’clock. Opposite capsules are 34 mm apart.',
+    'The display pairs the sound name with a purple sector pointing toward its source.',
+    'The outer bezel frames the display and protects its edge.',
+    'A coil drives a suspended mass. The wrist-facing back cover transmits the selected pulse pattern.'
+  ];
   app.insertAdjacentHTML('beforeend',`
     <header><img class="brand-emblem" src="${emblem}" alt="Motorola logo">
     <p class="product-title" role="heading" aria-level="1">An Ambient Sound Perception Watch for the Hearing-Impaired</p>
-    ${film ? '' : `<nav class="workspace-switch" aria-label="Workspace">
-      <button aria-controls="teardown" aria-pressed="true">Teardown</button>
-      <button aria-controls="soundLab" aria-pressed="false">Sound Lab</button>
-    </nav>`}
+    ${film ? '' : '<div class="scene-actions" role="group" aria-label="Watch scene">'+viewButtons+'</div>'}
     <img class="brand-wordmark" src="${wordmark}" alt="motorola"></header>
-    <main id="teardown" aria-label="Watch teardown"><aside class="left">
-    <article class="bearing-panel"><h2>Bearing</h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>FROM 12 O’CLOCK</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>Simulated input</span><b id="sound"></b></div></article>
-    <article><h2>Sound recognition</h2><div class="readline"><strong id="className"></strong><span id="classMode">On-device AI<br>Simulation</span></div><canvas id="graph" width="560" height="64"></canvas><div class="haptic-settings"><h2>Sound & vibration</h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ Custom sound</button>'}
+    <main class="scene-surface" aria-label="Watch simulator">
+    <div id="teardown"><aside class="left">
+    <article class="hardware-detail"><h2>Hardware</h2><strong id="detailName"></strong><p id="detailText"></p>
+    <dl class="hardware-spec"><div><dt>Case diameter</dt><dd>42 mm</dd></div><div><dt>Mic spacing</dt><dd>34 mm</dd></div><div><dt>Channels</dt><dd>4</dd></div></dl></article>
+    <article class="haptic-settings"><h2>Sound & vibration</h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ Custom sound</button>'}
     <div class="haptic-readout"><span id="rhythmNow"></span><div id="pulses" aria-hidden="true"></div></div>
-    <p id="hapticFeedback" role="status"></p></div></article>
-    <article><h2>Microphone array</h2><div class="channels">${microphones.map((_,i)=>'<div class="cellrow"><b>M0'+(i+1)+'</b><i><em></em></i><span></span></div>').join('')}</div><div class="footpair"><span>Arrival time difference</span><b>Δt / μs</b></div></article>
-    </aside>
-    <section id="stage" aria-label="Rotatable 3D watch"><div class="stagecopy"><small>VIEW STATE</small><h1></h1><div class="english"></div></div></section>
-    <aside class="rightside"><article><h2>Position</h2><div class="radarbox"><canvas class="polar" width="180" height="180"></canvas><dl><dt>Mic spacing</dt><dd>34 mm</dd><dt>Channels</dt><dd>4 CH</dd><dt>Case diameter</dt><dd>42 mm</dd></dl></div></article>
-    <article><h2>Sound sources</h2><div class="options"></div><div class="slider"><label for="bearing">Bearing</label><input id="bearing" type="range" min="0" max="359" step="1" value="48"></div></article>
-    <article><h2>View controls</h2><nav class="tabs" aria-label="Teardown views">${tabButtons}</nav><div class="ltoggle"><button id="labelSwitch" aria-pressed="true">Part labels</button></div></article>
-    <article><h2>Parts</h2><div class="partlist">${parts.map((s,i)=>'<button data-part="'+i+'"><i></i><b>'+s+'</b><span>0'+(i+1)+'</span></button>').join('')}</div></article></aside></main>
-    ${film ? '' : '<section id="soundLab" role="main" aria-label="Sound Lab" hidden></section>'}
-    <footer><div class="consolefoot"><div class="trackinfo"><h2>Guided tour</h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="Pause guided tour"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div><div class="footline"><img class="brand-hackathon" src="${hackathon}" alt="hackathon"></div></footer>`);
+    <p id="hapticFeedback" role="status"></p></article></aside>
+    <section id="stage" aria-label="Rotatable 3D watch"><div class="stagecopy"><h1></h1><div class="english"></div></div></section>
+    <aside class="rightside"><article><div class="parts-heading"><h2>Parts</h2><button id="labelSwitch" aria-pressed="true" aria-label="Part labels">Labels</button></div>
+    <div class="partlist">${parts.map((s,i)=>'<button data-part="'+i+'"><i></i><b>'+s+'</b><span>0'+(i+1)+'</span></button>').join('')}</div></article></aside><div class="consolefoot"><div class="trackinfo"><h2>Guided tour</h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="Play guided tour"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div></div>
+    ${film ? '' : '<section id="soundLab" aria-label="Sound Lab" hidden></section>'}</main>
+    <footer><div class="footline"><img class="brand-hackathon" src="${hackathon}" alt="hackathon"></div></footer>`);
   const $=s=>app.querySelector(s),$$=s=>[...app.querySelectorAll(s)];
   bindWeightTitle($('.product-title'));
   const stage=$('#stage');stage.prepend(canvas);
@@ -51,7 +63,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   const tags=microphones.map((_,i)=>{const e=document.createElement('span');e.className='mic-tag';e.textContent='M0'+(i+1);stage.append(e);return e;});
   const renderer=new T.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});
   renderer.setClearColor(0,0);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.92;
-  renderer.setPixelRatio(Math.min(devicePixelRatio,1.65));
+  const sceneDpr=Math.min(devicePixelRatio,1.65);
+  renderer.setPixelRatio(sceneDpr);
   const scene=new T.Scene(),camera=new T.OrthographicCamera(-40,40,40,-40,.1,500);
   camera.position.z=180;
   const studio=new RoomEnvironment(),pm=new T.PMREMGenerator(renderer),env=pm.fromScene(studio,.025);
@@ -59,15 +72,42 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   scene.add(new T.HemisphereLight(0xf4f3ff,0x696878,.80));
   for(const [x,y,z,p] of [[-50,70,90,1.7],[80,30,-10,1.35],[30,-60,55,.42]]){const l=new T.DirectionalLight(0xffffff,p);l.position.set(x,y,z);scene.add(l);}
   const watch=buildWatch();scene.add(watch.root);
-  const polar=$('.polar').getContext('2d'),spec=$('#graph').getContext('2d');
   const samples=watch.layers.map(layer=>{
     const out=[];layer.traverse(o=>{if(!o.isMesh)return;const pos=o.geometry.attributes.position;
       for(let i=0;i<pos.count;i+=Math.max(1,Math.floor(pos.count/600)))out.push(new T.Vector3().fromBufferAttribute(pos,i));});return out;});
-  let W=1,H=1,manual=false,idle=0,current={stage:0,src:0,bearing:48,explode:0},stageId=-1,sel=-1,lastSound=-1;
-  let savedTime=0,rx=0,ry=0,zoom=1,drag=null,lastT=0,tourOffset=0,opening=null;
-  function user(){stopPreview();if(!manual)savedTime=(lastT-tourOffset+tl.duration)%tl.duration;manual=true;idle=performance.now();}
-  function setStage(i){user();sel=-1;rx=ry=0;zoom=1;opening=i===1?performance.now():null;current={...current,stage:i,explode:i===1?0:1};}
-  $$('.tabs button').forEach(button=>button.onclick=()=>setStage(Number(button.dataset.stage)));
+  let W=1,H=1,manual=!film,current={stage:0,src:0,bearing:48,explode:0},stageId=-1,sel=-1;
+  let savedTime=0,rx=0,ry=0,zoom=1,drag=null,lastT=0,tourOffset=0;
+  const actions=$('.scene-actions'),labHost=$('#soundLab'),hardware=$('#teardown');
+  const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  let lab=null,labDial=null,lastLabResult=null,useLabResult=false,labClock=0,lastDetail='';
+  const motion=createSceneMotion({app,stage,canvas,hardware,labHost,footer:$('.consolefoot')});
+  function user(){
+    stopPreview();
+    if(!manual){
+      savedTime=(lastT-tourOffset+tl.duration)%tl.duration;
+      motion.setExplosion(current.stage===1?current.explode:0);
+      sel=({2:4,3:3,5:7})[current.stage]??-1;
+    }
+    manual=true;
+  }
+  function selectScene(name){
+    user(); sel=-1; drag=null; rx=ry=0; zoom=1;
+    if(name==='lab'){
+      if(!lab)lab=createSoundLab(labHost,{onDialState:state=>{
+        labDial=state;
+        if(!state.listening)lastLabResult=state;
+      }});
+      motion.setReceiver(lab.receiver);
+      useLabResult=true;
+    }
+    current.stage=name==='exploded'?1:0;
+    motion.select(name);
+    stageId=-1;
+  }
+  actions?.addEventListener('click',e=>{
+    const button=e.target.closest('button[data-scene]');
+    if(button) selectScene(button.dataset.scene);
+  });
   let lastDetection = '', pulseStart = -Infinity;
   let previewTiming = [];
   const feedback = $('#hapticFeedback');
@@ -82,23 +122,16 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   }
   function selectSound(index) {
     user();
+    useLabResult=false;
     current.src = index;
     current.bearing = catalog[index].angle;
   }
   const rhythmFor = sound => sound.custom ? sound.rhythm : assignments[sound.en];
   function drawSoundControls() {
-    const options = $('.options');
     const rows = $('#rhythmRows');
-    options.replaceChildren();
     rows.replaceChildren();
     for (const [index,sound] of catalog.entries()) {
       const label = sound.custom && sounds.some(preset => preset.name === sound.name) ? sound.name + ' (custom)' : sound.name;
-      const button = document.createElement('button');
-      button.dataset.sound = index;
-      button.textContent = label;
-      button.onclick = () => selectSound(index);
-      options.append(button);
-
       const row = document.createElement('div');
       row.className = 'rhythm-row';
       const title = document.createElement(sound.custom ? 'button' : 'label');
@@ -128,7 +161,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       preview.dataset.try = sound.en;
       preview.setAttribute('aria-label','Test vibration: ' + label);
       preview.onclick = () => {
-        if (current.stage !== 0) setStage(0);
+        selectScene('assembled');
+        motion.setExplosion(0);
         selectSound(index);
         const rect = stage.getBoundingClientRect();
         if (rect.top < 0 || rect.bottom > window.innerHeight) {
@@ -147,7 +181,6 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       row.append(title,select,preview);
       rows.append(row);
     }
-    lastSound = -1;
   }
   const openEditor = film ? null : createSoundEditor(catalog, (existing,name,rhythm) => {
     const sound = existing ?? customSound('custom-' + crypto.getRandomValues(new Uint32Array(4)).join('-'),name,rhythm);
@@ -173,110 +206,62 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopPreview();
   });
-  $('#bearing').oninput=e=>{user();current.bearing=+e.target.value;};
   let labels=true;
   $('#labelSwitch').onclick=()=>{user();labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
   $$('.partlist button').forEach((button,i)=>button.onclick=()=>{
-    const selected=sel===i || (current.stage===5 && i===7);
-    if(i===7 && !selected){setStage(5);return;}
-    setStage(1);
-    sel=selected?-1:i;
-    current.explode=1;
-    opening=null;
+    const selected=sel===i;
+    selectScene('exploded');
+    if(!selected){
+      sel=i;
+      current.stage=i===7?5:i===4?2:i===3?3:1;
+      motion.setExplosion(0);
+    }
+    stageId=-1;
   });
-  function restart(){stopPreview();manual=false;tourOffset=lastT-savedTime;stageId=-1;sel=-1;rx=ry=0;zoom=1;opening=null;}
+  function restart(){
+    if(motion.target==='lab')return;
+    stopPreview(); manual=false; useLabResult=false; tourOffset=lastT-savedTime;
+    stageId=-1;sel=-1;rx=ry=0;zoom=1;
+  }
   $('.play').onclick=()=>manual?restart():user();
-  canvas.onpointerdown=e=>{user();drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};
+  canvas.onpointerdown=e=>{
+    if(motion.dock>0)return;
+    user();drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);
+  };
   canvas.onpointermove=e=>{if(!drag)return;user();ry+=(e.clientX-drag[0])*.009;rx+=(e.clientY-drag[1])*.009;drag=[e.clientX,e.clientY];};
   canvas.onpointerup=canvas.onpointercancel=()=>drag=null;
-  canvas.addEventListener('wheel',e=>{e.preventDefault();user();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
-  const workspaceSwitch=$('.workspace-switch'),labHost=$('#soundLab');
-  let lab=null,inLab=false,heldTime=0,labClock=0;
-  function selectWorkspace(button){
-    const next=button.getAttribute('aria-controls')==='soundLab';
-    if(next===inLab)return;
-    if(next){
-      stopPreview();
-      heldTime=(lastT-tourOffset+tl.duration)%tl.duration;
-    }else{
-      tourOffset=lastT-heldTime;
-      idle=performance.now();
+  canvas.addEventListener('wheel',e=>{if(motion.dock>0)return;e.preventDefault();user();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
+  window.addEventListener('keydown',e=>{
+    if(film||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('dialog'))return;
+    if(motion.target==='lab'||e.target.closest('button,input,select')){
+      if(e.key===' '||e.key.startsWith('Arrow'))e.stopImmediatePropagation();
+      return;
     }
-    inLab=next;
-    $('#teardown').hidden=next;
-    $('.consolefoot').hidden=next;
-    labHost.hidden=!next;
-    for(const choice of workspaceSwitch.querySelectorAll('button'))choice.setAttribute('aria-pressed',choice===button);
-    if(next){
-      lab??=createSoundLab(labHost);
-      lab.replay();
-    }else resize();
+    if(e.key==='1'||e.key==='2'||e.key==='3') selectScene(['assembled','exploded','lab'][Number(e.key)-1]);
+    else if(e.key===' '){manual?restart():user();}
+    else if(e.key.startsWith('Arrow')){
+      user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;
+      if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;
+    }else return;
+    e.preventDefault();e.stopImmediatePropagation();
+  });
+  function resize(){
+    const w=canvas.clientWidth,h=canvas.clientHeight;
+    const dpr=motion.dock===1?Math.max(2,sceneDpr):sceneDpr;
+    if(renderer.getPixelRatio()!==dpr)renderer.setPixelRatio(dpr);
+    if(w&&h&&(w!==W||h!==H)){W=w;H=h;renderer.setSize(W,H,false);}
   }
-  if(workspaceSwitch){
-    const [teardownButton,labButton]=workspaceSwitch.querySelectorAll('button');
-    let gesture=null,suppressClick=false;
-    workspaceSwitch.addEventListener('click',event=>{
-      const button=event.target.closest('button');
-      if(button&&(!suppressClick||event.detail===0))selectWorkspace(button);
-    });
-    workspaceSwitch.addEventListener('pointerdown',event=>{
-      const button=event.target.closest('button');
-      if(!button||event.button!==0||!event.isPrimary)return;
-      suppressClick=false;
-      const position=new DOMMatrixReadOnly(getComputedStyle(workspaceSwitch,'::before').transform).m41;
-      const travel=labButton.getBoundingClientRect().left-teardownButton.getBoundingClientRect().left;
-      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,position,travel,dragging:false};
-      button.setPointerCapture(event.pointerId);
-    });
-    function moveThumb(event){
-      const dx=event.clientX-gesture.x;
-      if(!gesture.dragging){
-        if(Math.abs(dx)<5||Math.abs(dx)<Math.abs(event.clientY-gesture.y))return;
-        gesture.dragging=true;
-        workspaceSwitch.classList.add('is-dragging');
-      }
-      const offset=Math.max(0,Math.min(gesture.travel,gesture.position+dx));
-      workspaceSwitch.style.setProperty('--thumb-offset',offset+'px');
-      return offset;
-    }
-    workspaceSwitch.addEventListener('pointermove',event=>{
-      if(gesture?.id===event.pointerId)moveThumb(event);
-    });
-    function finishGesture(event){
-      if(gesture?.id!==event.pointerId)return;
-      if(event.type==='pointerup'){
-        const offset=moveThumb(event);
-        if(offset!==undefined){
-          const target=offset>=gesture.travel/2?labButton:teardownButton;
-          selectWorkspace(target);
-          target.focus({preventScroll:true});
-        }
-      }
-      suppressClick=gesture.dragging;
-      gesture=null;
-      workspaceSwitch.classList.remove('is-dragging');
-      workspaceSwitch.style.removeProperty('--thumb-offset');
-    }
-    workspaceSwitch.addEventListener('pointerup',finishGesture);
-    workspaceSwitch.addEventListener('lostpointercapture',finishGesture);
-  }
-  app.addEventListener('pointerdown',e=>{if(!film&&!inLab&&!e.target.closest('.play,.workspace-switch'))user();});
-  // Keep the teardown runtime's global shortcuts out of the lab's keyboard controls.
-  window.addEventListener('keydown',e=>{if(inLab||workspaceSwitch?.contains(e.target))e.stopImmediatePropagation();});
-  window.addEventListener('keydown',e=>{if(film||inLab||workspaceSwitch?.contains(e.target)||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('dialog'))return;if(e.target.matches('input,select')||((e.key===' '||e.key==='Enter')&&e.target.matches('button')))return;
-    if(/^[1-6]$/.test(e.key)){setStage(tabOrder[+e.key-1]);}else if(e.key===' '){manual?restart():user();}else if(e.key.startsWith('Arrow')){user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;}else return;e.preventDefault();e.stopImmediatePropagation();},true);
-  function resize(){if(inLab)return;W=stage.clientWidth;H=stage.clientHeight;if(W&&H)renderer.setSize(W,H,false);}
-  new ResizeObserver(resize).observe(stage);
+  new ResizeObserver(resize).observe(canvas);
   const explodeOffsets=[0,-9,10,24,38,52,65,0];
   function pose(c,t,drive){
-    const id=c.stage,ex=id===1&&sel<0?c.explode:0,angle=t*.45;
+    const id=c.stage,ex=id===1&&sel<0?c.explode:0,angle=t*.45,dock=motion.dock;
     let yaw=-.62+.11*Math.sin(angle),pitch=.13+.06*Math.sin(angle*.55),roll=-.17;
     if(id===1){yaw=T.MathUtils.lerp(-.66,.88+.075*Math.sin(angle),ex);pitch=T.MathUtils.lerp(.14,-.61,ex);roll=T.MathUtils.lerp(-.17,.13,ex);}
     if(id===2||id===3||sel>=0){yaw=-.23+.21*Math.sin(angle*.55);pitch=.28;roll=-.10;}
     if(id===5){yaw=-.22;pitch=-.55;roll=-.12;}
     if(id===4){yaw=.12*Math.cos(angle*.60);pitch=.035;roll=.025;}
     watch.root.position.set(0,0,0);
-    watch.root.rotation.set(pitch+rx,yaw+ry,roll,'YXZ');
+    watch.root.rotation.set((pitch+rx)*(1-dock),(yaw+ry)*(1-dock),roll*(1-dock),'YXZ');
     const focus=id===1?sel:id===2?4:id===3?3:id===5?7:-1;
     watch.layers.forEach((g,i)=>{g.visible=focus<0||focus===i;g.position.z=explodeOffsets[i]*ex;});
     // Once the cell clears the LRA, bring it onto the case axis for the exploded view.
@@ -288,10 +273,10 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     const bounds=new T.Box3().makeEmpty(),v=new T.Vector3();
     watch.layers.forEach((g,i)=>{if(g.visible)for(const p of samples[i])bounds.expandByPoint(v.copy(p).applyMatrix4(g.matrixWorld));});
     const centre=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
-    const coverage=focus>=0?.69:id===1?.76:.84;
-    const height=Math.max(size.y/coverage,size.x/(W/H*coverage),1)/zoom;
+    const coverage=focus>=0?.69:T.MathUtils.lerp(.84,.76,ex);
+    const height=T.MathUtils.lerp(Math.max(size.y/coverage,size.x/(W/H*coverage),1)/zoom,52*H/W,dock);
     camera.left=-height*W/H/2;camera.right=-camera.left;camera.top=height/2;camera.bottom=-height/2;
-    camera.position.set(centre.x,centre.y,180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    camera.position.set(centre.x*(1-dock),centre.y*(1-dock),180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
     // Frame the resting assembly first so the camera does not track its vibration.
     if(id===0 || id===4) watch.root.translateY(-1.15*drive);
     leaders.hidden=!(id===1 && ex>.76 && sel<0 && labels && W>310);
@@ -315,35 +300,55 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       const [x,y]=microphones[i];v.set(x*1.25,y*1.25,3.0).applyMatrix4(watch.array.matrixWorld).project(camera);
       tag.style.left=((v.x+1)*W/2)+'px';tag.style.top=((1-v.y)*H/2)+'px';});
   }
-  function azimuth(s){const c=polar;c.setTransform(1,0,0,1,90,90);c.clearRect(-90,-90,180,180);const a=(s.angle-90)*Math.PI/180;
-    for(const r of [36,65]){c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.strokeStyle='#a8a7b9';c.lineWidth=1.5;c.stroke();}
-    for(let i=0;i<12;i++){c.save();c.rotate(i*Math.PI/6);c.fillStyle='#7e7b91';c.fillRect(-1,-74,2,i%3?5:10);c.restore();}
-    c.beginPath();c.moveTo(0,0);c.arc(0,0,65,a-Math.PI/9,a+Math.PI/9);c.closePath();c.fillStyle='#b7a8ed';c.fill();
-    c.beginPath();c.moveTo(0,0);c.lineTo(66*Math.cos(a),66*Math.sin(a));c.strokeStyle='#614cb4';c.lineWidth=3;c.stroke();c.beginPath();c.arc(0,0,4,0,7);c.fillStyle='#6251ad';c.fill();
-  }
+  let docked=false,paintedDial=null,paintedWidth=0,paintedHeight=0;
   function render(raw){
-    if(inLab)labClock+=(raw-lastT+tl.duration)%tl.duration;
+    const dt=(raw-lastT+tl.duration)%tl.duration;
     lastT=raw;
-    if(inLab){lab.render(labClock);return;}
-    if(!film&&manual&&!drag&&performance.now()-idle>25000&&!document.querySelector('.sound-editor[open]'))restart();
     const t=(raw-tourOffset+tl.duration)%tl.duration;
-    if(!manual){const a=tour(t);current={...a,bearing:sounds[a.src].angle};}
-    if(manual&&opening!==null){const x=Math.min(1,(performance.now()-opening)/1450);current.explode=x*x*(3-2*x);if(x===1)opening=null;}
-    const c=current,id=c.stage,s=acousticState(c.src,c.bearing,t,catalog);
-    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','VIBRATOR'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
-      $$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.stage)===id));}
-    if(lastSound!==c.src){lastSound=c.src;$$('.options button').forEach((b,i)=>b.setAttribute('aria-pressed',c.src===i));}
-    $$('.partlist button').forEach((b,i)=>b.setAttribute('aria-pressed',sel===i||(id===2&&i===4)||(id===3&&i===3)||(id===5&&i===7)));
-    $('#value').textContent=s.degree+'°';$('#className').textContent=s.detected.name;$('#sound').textContent=s.detected.custom ? 'CUSTOM' : s.detected.en;
-    if (lastDetection.split('/')[0] !== s.detected.en) {
-      $('#classMode').innerHTML = s.detected.custom ? 'Custom<br>Simulation' : 'On-device AI<br>Simulation';
+    if(!manual){
+      const a=tour(t);current={...a,bearing:sounds[a.src].angle};
+      motion.tour(a.stage===0||a.stage===4?'assembled':'exploded',a.explode);
+    }else{
+      motion.advance(dt,reducedMotion.matches,sel>=0);
+      current.explode=motion.explosion;
+      if(sel<0)current.stage=motion.explosion>0||motion.target==='exploded'?1:0;
     }
-    $('#bearing').value=Math.round(s.angle)%360;azimuth(s);
-    $$('.cellrow').forEach((row,i)=>{row.querySelector('em').style.width=(2+s.delays[i]/101*98)+'%';row.querySelector('span').textContent=Math.round(s.delays[i])+' μs';});
-    spec.clearRect(0,0,560,64);s.spectrum.forEach((v,i)=>{for(let j=0;j<8;j++){spec.fillStyle=j<Math.round(v*8)?'#8264bf':'#cbcddd';spec.fillRect(i*71,57-j*7,56,5);}});
-    const w=$('#wave').getContext('2d');w.clearRect(0,0,500,100);w.strokeStyle='#8d81aa';w.lineWidth=1;w.beginPath();w.moveTo(0,50);w.lineTo(500,50);w.stroke();w.beginPath();
-    for(let i=0;i<=500;i++){const u=i/500;let sum=0;s.spectrum.forEach((amp,k)=>sum+=amp*Math.sin(u*(25+k*13)-t*(4+k*.45)));const y=50+sum*15*(.22+.78*Math.pow(Math.sin(u*Math.PI*2.4-t),4));if(i===0)w.moveTo(i,y);else w.lineTo(i,y);}w.strokeStyle='#d3baff';w.lineWidth=2.6;w.stroke();
-    $('.play').textContent=manual?'▶':'Ⅱ';$('.play').setAttribute('aria-label',manual?'Resume guided tour':'Pause guided tour');
+    if(lab){
+      motion.layout();
+      const atReceiver=motion.dock===1;
+      if(atReceiver&&!docked){lab.resize();lab.replay();paintedDial=null;}
+      if(atReceiver){labClock+=dt;lab.render(labClock);}
+      docked=atReceiver;
+    }
+    resize();
+    const c=current,id=c.stage;
+    if(docked&&labDial){
+      // The docked watch is fixed; only the acoustic field and chip need to animate.
+      if(labDial!==paintedDial||W!==paintedWidth||H!==paintedHeight){
+        watch.dial.update(labDial);watch.actuator.update(false,0);
+        pose({stage:0,explode:0},0,0);
+        renderer.render(scene,camera);
+        paintedDial=labDial;paintedWidth=W;paintedHeight=H;
+      }
+      return;
+    }
+    const s=useLabResult&&lastLabResult?lastLabResult:acousticState(c.src,c.bearing,t,catalog);
+    const focus=sel>=0?sel:id===2?4:id===3?3:id===5?7:-1;
+    const detail=focus>=0?parts[focus]:overview[0];
+    if(lastDetail!==detail){
+      $('#detailName').textContent=detail;
+      $('#detailText').textContent=focus>=0?partNotes[focus]:overview[1];
+      $$('.partlist button').forEach((button,i)=>button.setAttribute('aria-pressed',i===focus));
+      lastDetail=detail;
+    }
+    if(stageId!==id){
+      stageId=id;
+      const [name,en,,description]=chapters[id];
+      $('.stagecopy h1').textContent=sel>=0?parts[sel]:name;
+      $('.english').textContent=sel>=0?'COMPONENT '+String(sel+1).padStart(2,'0'):en;
+      $('#description').textContent=sel>=0?partNotes[sel]:description;
+    }
+    $('.play').textContent=manual?'▶':'Ⅱ';$('.play').setAttribute('aria-label',manual?'Play guided tour':'Pause guided tour');
     const playhead=manual?savedTime:t;
     $('#trackTime').textContent=String(Math.floor(playhead)).padStart(2,'0')+' / '+tl.duration+' s';$('.progress i').style.width=(playhead/tl.duration*100)+'%';
     const sound = s.detected.en;
