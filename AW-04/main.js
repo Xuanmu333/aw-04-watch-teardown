@@ -1,8 +1,9 @@
 import * as T from 'three';
-import brandMarks from './brand-marks.json';
+import emblem from './marks/emblem.svg';
+import wordmark from './marks/wordmark.svg';
+import hackathon from './marks/hackathon.svg';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {runSim} from 'teardown-kit/runtime.js';
-import {bindGlass} from './glass.js';
 import {bindWeightTitle} from './weight-title.js';
 import {buildWatch} from './watch.js';
 import {sounds,acousticState,microphones} from './acoustics.js';
@@ -16,13 +17,14 @@ document.documentElement.lang='zh-CN';
 runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,title:'声向仪 AW-04',subtitle:'四麦声源定位手表'},director:{enabled:false}},async({canvas})=>{
   const app=document.querySelector('#app');
   app.classList.toggle('film',film);
-  const tabButtons=chapters.map((s,i)=>'<button data-stage="'+i+'">'+s[0]+'</button>').join('');
+  const tabOrder=[0,1,2,3,5,4];
+  const tabButtons=tabOrder.map(id=>'<button data-stage="'+id+'">'+chapters[id][0]+'</button>').join('');
   const assignments = loadAssignments(film);
   const catalog = [...sounds, ...(film ? [] : loadCustomSounds())];
   app.insertAdjacentHTML('beforeend',`
-    <header><img class="brand-emblem" src="${brandMarks.emblem}" alt="Motorola 徽标">
+    <header><img class="brand-emblem" src="${emblem}" alt="Motorola 徽标">
     <p class="product-title" role="heading" aria-level="1">SoudBridge，为听障人士设计的环境感知手表</p>
-    <img class="brand-wordmark" src="${brandMarks.wordmark}" alt="motorola"></header>
+    <img class="brand-wordmark" src="${wordmark}" alt="motorola"></header>
     <main><aside class="left">
     <article class="bearing-panel"><h2>声源方位 <small>BEARING</small></h2><div class="readline"><b id="value"></b><span>AZIMUTH<br>相对十二点</span></div><canvas id="wave" width="500" height="100"></canvas><div class="footpair"><span>模拟输入</span><b id="sound"></b></div></article>
     <article><h2>声音识别 <small>CLASSIFIER</small></h2><div class="readline"><strong id="className"></strong><span id="classMode">端侧 AI<br>模板模拟</span></div><canvas id="graph" width="560" height="64"></canvas><div class="haptic-settings"><h2>声音与振感 <small>HAPTICS</small></h2><div id="rhythmRows"></div>${film ? '' : '<button id="addSound">＋ 自定义声音</button>'}
@@ -35,7 +37,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     <article><h2>声源场景 <small>SOURCES</small></h2><div class="options"></div><div class="slider"><label for="bearing">方位角</label><input id="bearing" type="range" min="0" max="359" step="1" value="48"></div></article>
     <article><h2>显示控制 <small>DISPLAY</small></h2><nav class="tabs" aria-label="拆解章节">${tabButtons}</nav><div class="ltoggle"><button id="labelSwitch" aria-pressed="true">部件标注</button></div></article>
     <article><h2>部件索引 <small>ASSEMBLIES</small></h2><div class="partlist">${parts.map((s,i)=>'<button data-part="'+i+'"><i></i><b>'+s+'</b><span>0'+(i+1)+'</span></button>').join('')}</div></article></aside></main>
-    <footer><div class="consolefoot"><div class="trackinfo"><h2>导览记录 <small>SEQUENCE LOG</small></h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="暂停自动导览"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div><div class="footline"><img class="brand-hackathon" src="${brandMarks.hackathon}" alt="hackathon"><span>AW–04 &nbsp; · &nbsp; ACOUSTIC SYSTEMS</span></div></footer>`);
+    <footer><div class="consolefoot"><div class="trackinfo"><h2>导览记录 <small>SEQUENCE LOG</small></h2><span id="description"></span></div><div class="timeline"><button class="play" aria-label="暂停自动导览"></button><div class="track"><div class="progress"><i></i></div><div class="trackticks"></div></div><b id="trackTime"></b></div></div><div class="footline"><img class="brand-hackathon" src="${hackathon}" alt="hackathon"></div></footer>`);
   const $=s=>app.querySelector(s),$$=s=>[...app.querySelectorAll(s)];
   bindWeightTitle($('.product-title'));
   const stage=$('#stage');stage.prepend(canvas);
@@ -59,7 +61,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   let savedTime=0,rx=0,ry=0,zoom=1,drag=null,lastT=0,tourOffset=0,opening=null;
   function user(){if(!manual)savedTime=(lastT-tourOffset+tl.duration)%tl.duration;manual=true;idle=performance.now();}
   function setStage(i){user();if(i===5)replay=true;sel=-1;rx=ry=0;zoom=1;opening=i===1?performance.now():null;current={...current,stage:i,explode:i===1?0:1};}
-  $$('.tabs button').forEach((button,i)=>button.onclick=()=>setStage(i));
+  $$('.tabs button').forEach(button=>button.onclick=()=>setStage(Number(button.dataset.stage)));
   let lastDetection = '', lastTourCue = -1, pulseStart = -Infinity, replay = false;
   const feedback = $('#hapticFeedback');
   const pulseBars = $('#pulses');
@@ -148,7 +150,6 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     drawSoundControls();
     feedback.textContent = sound.name + (saved ? '，已删除。' : '，仅本次移除。');
   });
-  bindGlass(document.querySelectorAll('#app article,#app .consolefoot,.sound-editor'));
   if (!film) $('#addSound').onclick = () => { user(); openEditor(null); };
   drawSoundControls();
   $('.haptic-settings').addEventListener('keydown', event => event.stopPropagation());
@@ -174,7 +175,7 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
   canvas.addEventListener('wheel',e=>{e.preventDefault();user();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
   app.addEventListener('pointerdown',e=>{if(!e.target.closest('.play')&&!film)user();});
   window.addEventListener('keydown',e=>{if(film||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('dialog'))return;if(e.target.matches('input,select')||((e.key===' '||e.key==='Enter')&&e.target.matches('button')))return;
-    if(/^[1-6]$/.test(e.key)){setStage(+e.key-1);}else if(e.key===' '){manual?restart():user();}else if(e.key.startsWith('Arrow')){user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;}else return;e.preventDefault();e.stopImmediatePropagation();},true);
+    if(/^[1-6]$/.test(e.key)){setStage(tabOrder[+e.key-1]);}else if(e.key===' '){manual?restart():user();}else if(e.key.startsWith('Arrow')){user();if(e.key==='ArrowLeft')ry-=.12;if(e.key==='ArrowRight')ry+=.12;if(e.key==='ArrowUp')rx-=.12;if(e.key==='ArrowDown')rx+=.12;}else return;e.preventDefault();e.stopImmediatePropagation();},true);
   function resize(){W=stage.clientWidth;H=stage.clientHeight;if(W&&H)renderer.setSize(W,H,false);}
   new ResizeObserver(resize).observe(stage);
   const explodeOffsets=[0,-9,10,24,38,52,65,0];
@@ -189,6 +190,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     watch.root.rotation.set(pitch+rx,yaw+ry,roll,'YXZ');
     const focus=id===1?sel:id===2?4:id===3?3:id===5?7:-1;
     watch.layers.forEach((g,i)=>{g.visible=focus<0||focus===i;g.position.z=explodeOffsets[i]*ex;});
+    // Once the cell clears the LRA, bring it onto the case axis for the exploded view.
+    watch.battery.position.x=-5*(1-T.MathUtils.smoothstep(ex,.32,.70));
     // Follow the back cover out of the battery bay before passing the case rim.
     const outward=T.MathUtils.smoothstep(ex,.58,1);
     watch.actuator.layer.position.set(12.35+30*outward,-12*outward,-3.375-6.4*ex);
@@ -207,13 +210,15 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
       const dpr=Math.min(devicePixelRatio,2);
       if(leaders.width!==Math.round(W*dpr)||leaders.height!==Math.round(H*dpr)){leaders.width=Math.round(W*dpr);leaders.height=Math.round(H*dpr);}
       legend.setTransform(dpr,0,0,dpr,0,0);legend.clearRect(0,0,W,H);
-      const points=[[15,-13,0],[-8,-10,-6],[4,-8,-2],[13,-8,-.5],[14,-9,1.7],[14,-8,3.9],[17,-8,5.7],[0,0,1.69]];
+      const points=[[15,-13,0],[-8,-10,-6],[9,-8,-2],[13,-8,-.5],[14,-9,1.7],[14,-8,3.9],[17,-8,5.7],[0,0,1.69]];
       const anchors=points.map((p,i)=>{v.fromArray(p).applyMatrix4(watch.layers[i].matrixWorld).project(camera);return {x:(v.x+1)*W/2,y:(1-v.y)*H/2,i};}).sort((a,b)=>a.y-b.y);
       legend.font=W<480?'500 11px "PingFang SC", sans-serif':'500 13px "PingFang SC", sans-serif';
       const labelWidth=Math.max(...parts.map(name=>legend.measureText(name).width));
       const end=Math.min(W*.865,W-labelWidth-14);let prev=-50;
+      legend.strokeStyle='#777288';
+      legend.lineWidth=.9;
       for(const {x,y,i} of anchors){const yy=Math.max(y,prev+23);prev=yy;
-        legend.beginPath();legend.moveTo(x,y);legend.lineTo(Math.max(x+8,end-30),yy);legend.lineTo(end,yy);legend.strokeStyle=i===7?'#6740aa':'#777288';legend.lineWidth=i===7?1.8:.9;legend.stroke();
+        legend.beginPath();legend.moveTo(x,y);legend.lineTo(Math.max(x+8,end-30),yy);legend.lineTo(end,yy);legend.stroke();
         legend.beginPath();legend.arc(x,y,2.3,0,7);legend.fillStyle='#6551a8';legend.fill();
         legend.fillStyle='#484458';legend.fillText(parts[i],end+7,yy+4);}
     }
@@ -233,8 +238,8 @@ runSim({duration:tl.duration,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:
     if(!manual){const a=tour(t);current={...a,bearing:sounds[a.src].angle};}
     if(manual&&opening!==null){const x=Math.min(1,(performance.now()-opening)/1450);current.explode=x*x*(3-2*x);if(x===1)opening=null;}
     const c=current,id=c.stage,s=acousticState(c.src,c.bearing,t,catalog);
-    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','线性振动器'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
-      $$('.tabs button').forEach((b,i)=>b.setAttribute('aria-pressed',i===id));}
+    if(stageId!==id){stageId=id;const [,en,title,des]=chapters[id];$('h1').textContent=['ASSEMBLED','TEARDOWN','MIC ARRAY','AI CORE','AZIMUTH','LRA'][id];$('.english').textContent=title+'  /  '+en;$('#description').textContent=des;
+      $$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.stage)===id));}
     if(lastSound!==c.src){lastSound=c.src;$$('.options button').forEach((b,i)=>b.setAttribute('aria-pressed',c.src===i));}
     $$('.partlist button').forEach((b,i)=>b.setAttribute('aria-pressed',sel===i||(id===2&&i===4)||(id===3&&i===3)||(id===5&&i===7)));
     $('#value').textContent=s.degree+'°';$('#className').textContent=s.detected.name;$('#sound').textContent=s.detected.custom ? '自定义场景' : s.detected.en;

@@ -102,9 +102,9 @@ export function buildWatch(){
   for(let i=0;i<28;i++){let a=i*tau/28;const rib=box(crown,.34,.33,2.8,.1,bright,Math.sin(a)*2.78,Math.cos(a)*2.78,0);rib.rotation.z=-a;}
   disc(back,19.88,1.15,brushed,0,0,-5.6);disc(back,15.5,.8,graphite,0,0,-6.43);disc(back,10.5,.35,ti,0,0,-6.96);
   for(let i=0;i<6;i++){let a=i*tau/6;screw(back,18*Math.cos(a),18*Math.sin(a),-6.20);}
-  disc(battery,12.8,2.75,brushed,-5,0,-3.42);disc(battery,12.2,.24,ti,-5,0,-1.94);
-  box(battery,5,3,.38,.4,violet,-5,11.2,-1.78);
-  painted(battery,256,(c,n)=>{c.fillStyle='#494959';c.textAlign='center';c.font='600 36px monospace';c.fillText('Li-ion',n/2,115);c.font='20px monospace';c.fillText('AW / CELL',n/2,155);},-5,0,-1.78,17);
+  disc(battery,12.8,2.75,brushed,0,0,-3.42);disc(battery,12.2,.24,ti,0,0,-1.94);
+  box(battery,5,3,.38,.4,violet,0,11.2,-1.78);
+  painted(battery,256,(c,n)=>{c.fillStyle='#494959';c.textAlign='center';c.font='600 36px monospace';c.fillText('Li-ion',n/2,115);c.font='20px monospace';c.fillText('AW / CELL',n/2,155);},0,0,-1.78,17);
   disc(pcb,17.6,1.0,boardMat,0,0,-1.03);
   // Spring contacts meet the two LRA flex pads when the board is seated.
   for(const y of [-.25,.25])disc(pcb,.11,2.735,bright,17.05,y,-2.8975,16);
@@ -170,5 +170,5 @@ export function buildWatch(){
   layers.forEach(consolidate);
   const actuator=buildActuator(root);
   layers.push(actuator.layer);
-  return {root,layers,dial,pcb,array,display,hardware,actuator};
+  return {root,layers,dial,battery,pcb,array,display,hardware,actuator};
 }
