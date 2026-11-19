@@ -2,9 +2,10 @@ import {sounds} from './acoustics.js';
 
 // The instrument shows measured times in µs. Playback magnifies inter-mic gaps
 // separately from the trip to the watch so both are visible at room distances.
-export const AI_START = 2.5;
-export const OUTPUT_START = 6.5;
-export const CYCLE_DURATION = 8.3;
+const wavePlaybackRate = 0.7;
+export const AI_START = 2.5 / wavePlaybackRate;
+export const OUTPUT_START = AI_START + 4;
+export const CYCLE_DURATION = OUTPUT_START + 1.8;
 
 const fitStart = AI_START + (OUTPUT_START - AI_START) * .26;
 const locateStart = AI_START + (OUTPUT_START - AI_START) * .68;
@@ -24,12 +25,13 @@ const firstArrivalTime = firstUs => 0.55 + firstUs * 0.00002;
 
 export function receiveTime(arrivalsUs, index) {
   const firstUs = Math.min(...arrivalsUs);
-  return firstArrivalTime(firstUs) + Math.round(arrivalsUs[index] - firstUs) * secondsPerDelayUs;
+  return (firstArrivalTime(firstUs) + Math.round(arrivalsUs[index] - firstUs) * secondsPerDelayUs) / wavePlaybackRate;
 }
 
 // One physical clock for the room and the enlarged watch. Slow down while
 // the front crosses the microphone array, then let it travel on past the watch.
-export function waveTimeUs(elapsed, arrivalsUs) {
+export function waveTimeUs(playbackSeconds, arrivalsUs) {
+  const elapsed = playbackSeconds * wavePlaybackRate;
   const firstUs = Math.min(...arrivalsUs);
   const firstAt = firstArrivalTime(firstUs);
   if (elapsed <= firstAt) return firstUs * Math.max(0, elapsed) / firstAt;
