@@ -19,9 +19,9 @@ export function createSceneMotion({app,stage,canvas,hardware,labHost}) {
   select('assembled');
   app.dataset.motion='idle';
 
-  function advance(dt,reduced,isolated) {
+  function advance(dt,reduced) {
     const endTravel=target==='lab'?1:0;
-    const endOpen=target==='exploded'&&!isolated?1:0;
+    const endOpen=target==='exploded'?1:0;
     const step=Math.min(Math.max(dt,0),.1);
     if(reduced){opening=endOpen;travel=endTravel;}
     else if(travel>endTravel)travel=Math.max(endTravel,travel-step/.95);

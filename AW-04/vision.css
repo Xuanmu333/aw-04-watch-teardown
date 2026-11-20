@@ -191,10 +191,6 @@ details.parts-disclosure, details.hardware-haptics {
   grid-auto-flow: column;
   gap: 0 12px;
 }
-.parts-disclosure #partNote {
-  color: #554f60;
-  font: 13px/1.5 var(--sans);
-}
 details.hardware-haptics { padding-top: 0; border: 0; }
 .bearing-demo {
   display: grid;

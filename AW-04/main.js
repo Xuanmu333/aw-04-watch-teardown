@@ -13,6 +13,7 @@ import {rhythms, loadAssignments, saveAssignments, activePulse, drivePhase} from
 import {customSound, loadCustomSounds, saveCustomSounds, createSoundEditor} from './custom-sounds.js';
 import {createSoundLab} from './sound-lab.js';
 import {createSceneMotion} from './scene-motion.js';
+import {createPartVisibility} from './part-visibility.js';
 import './vision.css';
 
 const film=!!window.__CAPTURE || new URLSearchParams(location.search).has('capture');
@@ -55,14 +56,14 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
         </section>
         <section class="vision-panel" data-story="exploded" aria-labelledby="explodedTitle" inert>
           <p class="story-kicker">Exploded view</p>
-          <h2 id="explodedTitle" tabindex="-1">Inside the<br><em>sensation.</em></h2>
-          <p class="story-body">Four microphones catch a sound a fraction of a second apart. A chip works out what it is and where it came from. A tiny vibrator brings that moment to your wrist.</p>
+          <h2 id="explodedTitle" tabindex="-1"><span id="stackTitle">Inside the<br><em>sensation.</em></span><em id="partTitle" hidden></em></h2>
+          <p class="story-body" id="stackIntro">Four microphones catch a sound a fraction of a second apart. A chip works out what it is and where it came from. A tiny vibrator brings that moment to your wrist.</p>
+          <p class="story-body" id="partNote" aria-live="polite" hidden></p>
           <details class="parts-disclosure"><summary>Explore the eight parts</summary>
             <div class="parts-list partlist">${parts.map((s,i)=>'<button type="button" data-part="'+i+'" aria-pressed="false"><b>'+s+'</b><span>'+String(i+1).padStart(2,'0')+'</span></button>').join('')}</div>
-            <p id="partNote" aria-live="polite"></p>
             <button type="button" id="labelSwitch" aria-pressed="true">Part labels</button>
           </details>
-          <button class="story-action" id="assembleWatch"><span aria-hidden="true">←</span> Reassemble watch</button>
+          <button class="story-action" id="assembleWatch"><span aria-hidden="true">←</span> <span id="returnLabel">Reassemble watch</span></button>
         </section>
       </div>
       <section id="stage" aria-label="3D watch. Drag to rotate or scroll to zoom."></section>
@@ -104,10 +105,14 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   scene.add(new T.HemisphereLight(0xf4f3ff,0x696878,.80));
   for(const [x,y,z,p] of [[-50,70,90,1.7],[80,30,-10,1.35],[30,-60,55,.42]]){const l=new T.DirectionalLight(0xffffff,p);l.position.set(x,y,z);scene.add(l);}
   const watch=buildWatch();scene.add(watch.root);
+  const updatePartVisibility=createPartVisibility(watch);
   const samples=watch.layers.map(layer=>{
     const out=[];layer.traverse(o=>{if(!o.isMesh)return;const pos=o.geometry.attributes.position;
       for(let i=0;i<pos.count;i+=Math.max(1,Math.floor(pos.count/600)))out.push(new T.Vector3().fromBufferAttribute(pos,i));});return out;});
   let W=1,H=1,sel=-1;
+  const weights=watch.layers.map(()=>0),fromWeights=weights.slice();
+  const stackOrbit=new T.Vector3(0,0,1),orbitOffset=new T.Vector3();
+  let inspectionTime=1,inspectionBlend=1;
   const current={stage:0,src:0,bearing:48,explode:0};
   let rx=0,ry=0,zoom=1,drag=null,lastT=0;
   const actions=$('.scene-actions'),labHost=$('#soundLab'),hardware=$('#teardown');
@@ -128,7 +133,9 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   });
   function selectPage(page,exploded=false){
     setAngleDemo(null);
-    stopPreview(); sel=-1; drag=null; rx=ry=0; zoom=1;
+    stopPreview(); drag=null;
+    if(sel>=0||inspectionTime<1)inspectPart(-1,false);
+    else {rx=ry=0;zoom=1;}
     if(page==='lab'){
       if(!lab)lab=createSoundLab(labHost,{onDialState:state=>{
         labDial=state;
@@ -146,7 +153,6 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
     if(!exploded)$('.parts-disclosure').open=false;
     current.stage=exploded?1:0;
     motion.select(page==='lab'?'lab':view);
-    showPart(-1);
   }
   actions.addEventListener('click',e=>{
     const button=e.target.closest('button[data-tab]');
@@ -157,7 +163,7 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
     if(moveFocus)$(open?'#explodedTitle':'#visionTitle').focus({preventScroll:true});
   }
   $('#exploreWatch').onclick=()=>setExploded(true,true);
-  $('#assembleWatch').onclick=()=>setExploded(false,true);
+  $('#assembleWatch').onclick=()=>sel>=0?inspectPart(-1):setExploded(false,true);
   let lastDetection = '', pulseStart = -Infinity;
   let previewTiming = [];
   const feedback = $('#hapticFeedback');
@@ -258,36 +264,74 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   });
   let labels=true;
   $('#labelSwitch').onclick=()=>{labels=!labels;$('#labelSwitch').setAttribute('aria-pressed',labels);};
-  function showPart(index){
+  function inspectPart(index,restoreOrbit=true){
+    const detail=index>=0, remaining=1-inspectionBlend;
+    const startX=rx+orbitOffset.x*remaining,startY=ry+orbitOffset.y*remaining;
+    const startZoom=zoom*Math.exp(orbitOffset.z*remaining);
+    if(sel<0&&detail)stackOrbit.set(startX,startY,startZoom);
+    rx=!detail&&restoreOrbit?stackOrbit.x:0;
+    ry=!detail&&restoreOrbit?stackOrbit.y:0;
+    zoom=!detail&&restoreOrbit?stackOrbit.z:1;
+    const arc=angle=>Math.atan2(Math.sin(angle),Math.cos(angle));
+    orbitOffset.set(arc(startX-rx),arc(startY-ry),Math.log(startZoom/zoom));
+    for(let i=0;i<weights.length;i++)fromWeights[i]=weights[i];
+    inspectionTime=inspectionBlend=0;
     sel=index;
-    $('#partNote').textContent=index>=0?partNotes[index]:'';
+    $('#stackTitle').hidden=$('#stackIntro').hidden=detail;
+    $('#partTitle').hidden=$('#partNote').hidden=!detail;
+    $('#partTitle').textContent=detail?parts[index]:'';
+    $('#partNote').textContent=detail?partNotes[index]:'';
+    $('#returnLabel').textContent=detail?'Back to exploded view':'Reassemble watch';
     $$('.partlist button').forEach((button,i)=>button.setAttribute('aria-pressed',String(i===index)));
+    if(!reducedMotion.matches){
+      for(const node of [$('#explodedTitle'),$(detail?'#partNote':'#stackIntro')]){
+        node.getAnimations().forEach(animation=>animation.cancel());
+        node.animate([{opacity:.25,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{duration:300,easing:'ease-out'});
+      }
+    }
   }
-  $$('.partlist button').forEach((button,i)=>button.onclick=()=>{
-    rx=ry=0;zoom=1;
-    showPart(sel===i?-1:i);
-    current.stage=sel===7?5:sel===4?2:sel===3?3:1;
-  });
+  function advanceInspection(dt){
+    if(inspectionTime===1)return;
+    inspectionTime=reducedMotion.matches?1:Math.min(1,inspectionTime+Math.min(dt,.1)/.95);
+    inspectionBlend=T.MathUtils.smootherstep(inspectionTime,0,1);
+    for(let i=0;i<weights.length;i++)weights[i]=T.MathUtils.lerp(fromWeights[i],i===sel?1:0,inspectionBlend);
+  }
+  $$('.partlist button').forEach((button,i)=>button.onclick=()=>inspectPart(sel===i?-1:i));
   $('.parts-disclosure').addEventListener('toggle',e=>{
-    if(!e.target.open&&sel>=0){showPart(-1);rx=ry=0;zoom=1;current.stage=1;}
+    if(!e.target.open&&sel>=0)inspectPart(-1);
   });
   selectPage('vision');
   const picker=new T.Raycaster(),pointer=new T.Vector2();
   const face=watch.display.children.find(mesh=>mesh.material.map===watch.dial.texture);
-  function onFace(e,visibleOnly=false){
-    if(app.dataset.page!=='vision'||motion.target!=='assembled'||motion.explosion>0||motion.dock>0)return false;
+  const labelHits=[];
+  function pickPart(e){
+    if(app.dataset.page!=='vision'||motion.dock>0)return null;
+    const exploded=motion.target==='exploded';
+    if(!exploded&&(motion.target!=='assembled'||motion.explosion>0))return null;
     const r=canvas.getBoundingClientRect();
-    pointer.set(2*(e.clientX-r.left)/r.width-1,1-2*(e.clientY-r.top)/r.height);
+    const x=e.clientX-r.left,y=e.clientY-r.top;
+    if(exploded&&!leaders.hidden){
+      const label=labelHits.find(box=>x>=box.left&&x<=box.right&&Math.abs(y-box.y)<=10);
+      if(label)return label.index;
+    }
+    pointer.set(2*x/r.width-1,1-2*y/r.height);
     picker.setFromCamera(pointer,camera);
-    if(!picker.intersectObject(face,false).length)return false;
-    return !visibleOnly||picker.intersectObject(watch.root,true).find(hit=>hit.object.visible&&hit.object.parent.visible)?.object===face;
+    if(!exploded&&!picker.intersectObject(face,false).length)return null;
+    const meshes=[];
+    watch.root.traverseVisible(mesh=>{
+      if(mesh.isMesh&&mesh.material.visible&&mesh.material.opacity>.21&&!mesh.material.userData.decal)meshes.push(mesh);
+    });
+    let hit=picker.intersectObjects(meshes,false)[0]?.object;
+    if(!hit||(!exploded&&hit!==face))return null;
+    while(hit.parent!==watch.root)hit=hit.parent;
+    return hit.userData.partIndex;
   }
   canvas.onpointerdown=e=>{
     if(motion.dock>0||e.button!==0||drag)return;
     stopPreview();drag={id:e.pointerId,x:e.clientX,y:e.clientY,turned:false};canvas.setPointerCapture(e.pointerId);
   };
   canvas.onpointermove=e=>{
-    if(!drag){canvas.style.cursor=onFace(e)?'pointer':'';return;}
+    if(!drag){canvas.style.cursor=pickPart(e)!=null?'pointer':'';return;}
     if(drag.id!==e.pointerId)return;
     const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
     if(!drag.turned&&Math.hypot(dx,dy)<5)return;
@@ -298,7 +342,11 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
     if(drag?.id!==e.pointerId)return;
     const tap=!drag.turned&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5;
     drag=null;canvas.style.cursor='';
-    if(tap&&onFace(e,true))setExploded(true,false);
+    if(!tap)return;
+    const index=pickPart(e);
+    if(index==null)return;
+    if(motion.target==='assembled')setExploded(true,false);
+    else inspectPart(index===sel?-1:index);
   };
   canvas.onlostpointercapture=canvas.onpointercancel=()=>{drag=null;canvas.style.cursor='';};
   canvas.addEventListener('wheel',e=>{if(motion.dock>0)return;e.preventDefault();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.65,1.8);},{passive:false});
@@ -324,35 +372,54 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   }
   new ResizeObserver(resize).observe(canvas);
   const explodeOffsets=[0,-9,10,24,38,52,65,0];
+  const layerBounds=watch.layers.map(()=>new T.Box3()),stackBounds=new T.Box3();
+  const centre=new T.Vector3(),size=new T.Vector3(),v=new T.Vector3();
   function pose(c,t,drive){
-    const id=c.stage,ex=id===1&&sel<0?c.explode:0,angle=t*.45,dock=motion.dock;
+    const id=c.stage,ex=c.explode,angle=t*.45,dock=motion.dock;
+    const context=Math.max(0,1-weights.reduce((sum,w)=>sum+w,0)),detail=1-context;
+    const remaining=1-inspectionBlend,viewZoom=zoom*Math.exp(orbitOffset.z*remaining);
     let yaw=-.62+.11*Math.sin(angle),pitch=.13+.06*Math.sin(angle*.55),roll=-.17;
     if(id===1){yaw=T.MathUtils.lerp(-.66,.88+.075*Math.sin(angle),ex);pitch=T.MathUtils.lerp(.14,-.61,ex);roll=T.MathUtils.lerp(-.17,.13,ex);}
-    if(id===2||id===3||sel>=0){yaw=-.23+.21*Math.sin(angle*.55);pitch=.28;roll=-.10;}
-    if(id===5){yaw=-.22;pitch=-.55;roll=-.12;}
-    if(id===4){yaw=.12*Math.cos(angle*.60);pitch=.035;roll=.025;}
+    yaw=T.MathUtils.lerp(yaw,-.23,detail);
+    // Tilt the cutaway toward the viewer and turn the back cover over to its wrist-facing side.
+    pitch=pitch*context+.28*(detail-weights[7]-weights[1])-.55*weights[7]+(.32-Math.PI)*weights[1];
+    roll=T.MathUtils.lerp(roll,-.10,detail);
     watch.root.position.set(0,0,0);
-    watch.root.rotation.set((pitch+rx)*(1-dock),(yaw+ry)*(1-dock),roll*(1-dock),'YXZ');
-    const focus=id===1?sel:id===2?4:id===3?3:id===5?7:-1;
-    watch.layers.forEach((g,i)=>{g.visible=focus<0||focus===i;g.position.z=explodeOffsets[i]*ex;});
+    watch.root.rotation.set((pitch+rx+orbitOffset.x*remaining)*(1-dock),(yaw+ry+orbitOffset.y*remaining)*(1-dock),roll*(1-dock),'YXZ');
+    watch.layers.forEach((g,i)=>{g.position.z=explodeOffsets[i]*ex;});
     // Once the cell clears the LRA, bring it onto the case axis for the exploded view.
     watch.battery.position.x=-5*(1-T.MathUtils.smoothstep(ex,.32,.70));
     // Follow the back cover out of the battery bay before passing the case rim.
     const outward=T.MathUtils.smoothstep(ex,.58,1);
     watch.actuator.layer.position.set(12.35+30*outward,-12*outward,-3.375-6.4*ex);
-    watch.hardware(ex,focus);watch.root.updateMatrixWorld(true);
-    const bounds=new T.Box3().makeEmpty(),v=new T.Vector3();
-    watch.layers.forEach((g,i)=>{if(g.visible)for(const p of samples[i])bounds.expandByPoint(v.copy(p).applyMatrix4(g.matrixWorld));});
-    const centre=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
-    const coverage=focus>=0?.69:T.MathUtils.lerp(.84,.76,ex);
-    // Reserve the label column in the camera frame as the stack opens.
+    watch.hardware(ex,-1);
+    updatePartVisibility(weights);
+    watch.root.updateMatrixWorld(true);
+    stackBounds.makeEmpty();
+    watch.layers.forEach((g,i)=>{
+      if(context===0&&weights[i]===0)return;
+      const box=layerBounds[i].makeEmpty();
+      for(const point of samples[i])box.expandByPoint(v.copy(point).applyMatrix4(g.matrixWorld));
+      stackBounds.union(box);
+    });
+    // Blend complete camera frames so even an off-axis part stays in shot as it enlarges.
+    let height=0,cx=0,cy=0;
+    function frame(bounds,coverage,gutter,weight){
+      bounds.getCenter(centre);bounds.getSize(size);
+      const span=Math.max(size.y/coverage,size.x*H/((W-gutter)*coverage),1)/viewZoom;
+      height+=weight*span;
+      cx+=weight*(centre.x+gutter*span/(2*H));cy+=weight*centre.y;
+    }
     const gutter=labels&&W>310?Math.min(W*.31,155)*ex:0;
-    const height=T.MathUtils.lerp(Math.max(size.y/coverage,size.x/((W-gutter)/H*coverage),1)/zoom,52*H/W,dock);
+    if(context>0)frame(stackBounds,T.MathUtils.lerp(.84,.76,ex),gutter,context);
+    weights.forEach((weight,i)=>{if(weight>0)frame(layerBounds[i],.69,0,weight);});
+    height=T.MathUtils.lerp(height,52*H/W,dock);
     camera.left=-height*W/H/2;camera.right=-camera.left;camera.top=height/2;camera.bottom=-height/2;
-    camera.position.set((centre.x+gutter*height/(2*H))*(1-dock),centre.y*(1-dock),180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    camera.position.set(cx*(1-dock),cy*(1-dock),180);camera.updateProjectionMatrix();camera.updateMatrixWorld();
     // Frame the resting assembly first so the camera does not track its vibration.
     if(id===0 || id===4) watch.root.translateY(-1.15*drive);
-    leaders.hidden=!(id===1 && ex>.76 && sel<0 && labels && W>310);
+    leaders.hidden=!(id===1 && ex>.76 && context>.50 && labels && W>310);
+    if(!leaders.hidden)leaders.style.opacity=String(T.MathUtils.smoothstep(context,.50,1));
     if(!leaders.hidden){
       const dpr=Math.min(devicePixelRatio,2);
       if(leaders.width!==Math.round(W*dpr)||leaders.height!==Math.round(H*dpr)){leaders.width=Math.round(W*dpr);leaders.height=Math.round(H*dpr);}
@@ -364,12 +431,15 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
       const end=W-labelWidth-16;let prev=-50;
       legend.strokeStyle='#777288';
       legend.lineWidth=.9;
+      labelHits.length=0;
       for(const {x,y,i} of anchors){const yy=Math.max(y,prev+23);prev=yy;
+        labelHits.push({index:i,left:end+3,right:end+11+legend.measureText(parts[i]).width,y:yy});
         legend.beginPath();legend.moveTo(x,y);legend.lineTo(Math.max(x+8,end-30),yy);legend.lineTo(end,yy);legend.stroke();
         legend.beginPath();legend.arc(x,y,2.3,0,7);legend.fillStyle='#6551a8';legend.fill();
         legend.fillStyle='#484458';legend.fillText(parts[i],end+7,yy+4);}
     }
-    tags.forEach((tag,i)=>{tag.hidden=id!==2||!labels;if(tag.hidden)return;
+    tags.forEach((tag,i)=>{tag.hidden=weights[4]<.8||!labels;if(tag.hidden)return;
+      tag.style.opacity=String(T.MathUtils.smoothstep(weights[4],.8,1));
       const [x,y]=microphones[i];v.set(x*1.25,y*1.25,3.0).applyMatrix4(watch.array.matrixWorld).project(camera);
       tag.style.left=((v.x+1)*W/2)+'px';tag.style.top=((1-v.y)*H/2)+'px';});
   }
@@ -377,9 +447,10 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
   function render(t){
     const dt=(t-lastT+cfg.duration)%cfg.duration;
     lastT=t;
-    motion.advance(dt,reducedMotion.matches,sel>=0);
+    advanceInspection(dt);
+    motion.advance(dt,reducedMotion.matches);
     current.explode=motion.explosion;
-    if(sel<0)current.stage=motion.explosion>0||motion.target==='exploded'?1:0;
+    current.stage=motion.explosion>0||motion.target==='exploded'?1:0;
     if(lab){
       motion.layout();
       const atReceiver=motion.dock===1;
@@ -432,7 +503,7 @@ runSim({duration:28,fps:60,theme:'light',accent:'#6753bc',hud:{enabled:false,tit
       }));
     }
     for (let i = 0; i < pulseBars.children.length; i++) pulseBars.children[i].classList.toggle('playing', i === pulse);
-    watch.actuator.update(id===5,drive);
+    watch.actuator.update(weights[7]>.5,drive);
     watch.dial.update(s);
     pose(c,reducedMotion.matches||id===0?0:t,drive);
     renderer.render(scene,camera);

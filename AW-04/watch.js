@@ -16,7 +16,9 @@ function ring(p,ri,ro,lo,hi,m,bev=.12){return profile(p,[[ri,lo],[ro-bev,lo],[ro
 function painted(p,side,fn,x,y,z,w,h=w){
   const c=document.createElement('canvas');c.width=c.height=side;fn(c.getContext('2d'),side);
   const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=4;
-  return mesh(p,new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}),x,y,z);
+  const ink=new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false});
+  ink.userData.decal=true;
+  return mesh(p,new T.PlaneGeometry(w,h),ink,x,y,z);
 }
 function screw(p,x,y,z,r=.75,slotAngle=-.55){
   disc(p,r,.18,bright,x,y,z,24);const slot=box(p,r*1.38,.22,.06,.05,black,x,y,z+.11);slot.rotation.z=slotAngle;
@@ -66,8 +68,7 @@ function buildActuator(root){
   }
   springMesh.geometry.morphAttributes.position=[bent];
   springMesh.updateMorphTargets();
-  return {layer,update(section,drive){
-    cap.visible=!section;
+  return {layer,cap,update(section,drive){
     const phase=section ? drive : 0;
     mover.position.y=.23*phase;
     springMesh.morphTargetInfluences[0]=phase;
@@ -170,5 +171,10 @@ export function buildWatch(){
   layers.forEach(consolidate);
   const actuator=buildActuator(root);
   layers.push(actuator.layer);
+  layers.forEach((layer,i)=>{layer.userData.partIndex=i;});
+  for(const {g} of fasteners)g.userData.partIndex=6;
+  seals[0].userData.partIndex=6;
+  seals[1].userData.partIndex=4;
+  for(const {g} of guidePins)g.userData.partIndex=3;
   return {root,layers,dial,battery,pcb,array,display,hardware,actuator};
 }
